@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">LifeLane</string>
+    <string name="location_channel">Active emergency GPS</string>
+</resources>

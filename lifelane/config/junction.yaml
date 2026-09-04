@@ -1,0 +1,47 @@
+junction:
+  id: JN-001
+  name: LifeLane Demo Junction
+  latitude: 9.451500
+  longitude: 77.553500
+
+detection:
+  activation_radius_metres: 300
+  immediate_activation_radius_metres: 120
+  exit_radius_metres: 50
+  maximum_accuracy_metres: 30
+  maximum_packet_age_seconds: 5
+  heading_tolerance_degrees: 60
+  minimum_assumed_speed_mps: 2.0
+  waiting_time_protection_seconds: 30
+
+timing:
+  # Demonstration values only. These are not approved for real-road use.
+  normal_green_seconds: 10
+  minimum_green_seconds: 4
+  yellow_seconds: 2
+  all_red_seconds: 1
+  maximum_ambulance_green_seconds: 20
+
+mqtt:
+  broker: localhost
+  port: 1883
+  topic_prefix: lifelane
+  keepalive_seconds: 30
+
+simulation:
+  speed_multiplier: 1.0
+  ambulance_speed_mps: 12.0
+  gps_accuracy_metres: 6.0
+  packet_delay_seconds: 1.0
+
+security:
+  authorized_ambulance_ids:
+    - AMB-001
+    - AMB-002
+    - AMB-003
+    - AMB-004
+    - SIM-NORTH
+    - SIM-SOUTH
+    - SIM-EAST
+    - SIM-WEST
+    - SIM-SECOND
