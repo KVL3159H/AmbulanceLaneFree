@@ -12,3 +12,5 @@ android_app/build/
 .idea/
 *.iml
 local.properties
+build/
+dist/

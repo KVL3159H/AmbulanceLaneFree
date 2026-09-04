@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,16 @@ class JunctionConfig:
 
 
 def default_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "config" / "junction.yaml"
+    candidates = [
+        Path(__file__).resolve().parents[2] / "config" / "junction.yaml",
+        Path(__file__).resolve().parents[1] / "config" / "junction.yaml",
+        Path(getattr(sys, "_MEIPASS", "")) / "config" / "junction.yaml",
+        Path.cwd() / "config" / "junction.yaml",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
 
 
 def load_config(path: str | Path | None = None) -> JunctionConfig:

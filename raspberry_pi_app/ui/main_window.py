@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from pathlib import Path
+
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QIcon, QPainter
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -54,6 +56,12 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"LifeLane — {config.junction['name']}")
         self.resize(1280, 800)
         self.setMinimumSize(960, 640)
+
+        icon_path = Path(__file__).resolve().parents[1] / "resources" / "icons" / "lifelane.ico"
+        if not icon_path.exists():
+            icon_path = Path(__file__).resolve().parents[1] / "resources" / "icons" / "lifelane.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.mqtt: MQTTClient | None = None
         self.bridge = MQTTBridge()
         self.bridge.packet.connect(self.process_packet)

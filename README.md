@@ -1,6 +1,6 @@
 # LifeLane — Smart Ambulance Traffic Signal Preemption Simulator
 
-LifeLane is a Phase 1, software-only demonstration of a four-way traffic junction. It contains a native PySide6 desktop simulator for Raspberry Pi 5 and an Android/Kotlin application that transmits live fused-location telemetry over MQTT.
+LifeLane is a Phase 1, software-only demonstration of a four-way traffic junction. It contains a native PySide6 desktop simulator for Windows and Raspberry Pi 5, and an Android/Kotlin application that transmits live fused-location telemetry over MQTT.
 
 > **Safety boundary:** LifeLane is a simulator. The included signal timings are synthetic demonstration values and are **not approved for real-road use**. There is no GPIO, relay, cabinet, or physical signal control in this project.
 
@@ -18,6 +18,27 @@ LifeLane is a Phase 1, software-only demonstration of a four-way traffic junctio
 - SQLite storage for ambulances, trips, telemetry, and signal events using parameterized statements.
 - Rotating application logs in `logs/lifelane.log`.
 - Complete Android Studio Compose app with the requested screens, fused GPS, a foreground location service and ongoing notification, 1–2 second telemetry, MQTT reconnect/LWT/QoS 1, ViewModel, StateFlow, and coroutines.
+- First-class Windows desktop software: one-click runners (`run_windows.bat`), taskbar icon grouping with custom `AppUserModelID`, and standalone `.exe` build via PyInstaller.
+
+## Windows installation and standalone software (.exe)
+
+LifeLane runs natively on Windows 10/11. See [Windows Installation & Deployment Guide](docs/windows-installation.md) for full instructions.
+
+### 1. One-click setup & launch
+- **Run immediately:** double-click `run_windows.bat` in the project root.
+- **Install dependencies:** run `scripts\install_windows.bat` (or `scripts\install_windows.ps1` in PowerShell).
+
+### 2. Run via command line
+```cmd
+python -m windows_app.main
+```
+
+### 3. Build standalone Windows software (`LifeLane.exe`)
+To package LifeLane into an executable that runs without Python installed:
+```cmd
+scripts\build_windows_exe.bat
+```
+The compiled software will be generated at `dist\LifeLane\LifeLane.exe`.
 
 ## Raspberry Pi 5 installation
 
@@ -127,7 +148,8 @@ Android emulator note: use `10.0.2.2` for a broker on the development computer. 
 
 ```text
 config/                 junction and broker configuration
-docs/                   architecture, MQTT protocol, and test guide
+docs/                   architecture, Windows guide, MQTT protocol, and test guide
+windows_app/            native Windows desktop entry point and packaging
 raspberry_pi_app/core/  models, GPS, ETA, queue, passage, FSM, invariant
 raspberry_pi_app/ui/    native PySide6 widgets and graphics items
 raspberry_pi_app/communication/  MQTT topics, validation, and client
@@ -135,7 +157,7 @@ raspberry_pi_app/database/       SQLite schema and repository
 raspberry_pi_app/simulator/      cardinal synthetic paths
 android_app/            complete Gradle/Compose Android application
 tests/                  unit and integration tests
-scripts/                Raspberry Pi setup and launcher scripts
+scripts/                Windows (.bat, .ps1) and Raspberry Pi (.sh) launcher scripts
 ```
 
 ## Troubleshooting
