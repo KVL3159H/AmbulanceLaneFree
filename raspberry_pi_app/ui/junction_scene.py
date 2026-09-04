@@ -33,11 +33,11 @@ class JunctionScene(QGraphicsScene):
         self.signals: dict[Approach, TrafficSignalItem] = {}
         self.ambulances: dict[str, AmbulanceItem] = {}
         self.trails: dict[str, tuple[QGraphicsPathItem, deque[QPointF]]] = {}
-        self.setBackgroundBrush(QColor(Color.BACKGROUND))
+        self.setBackgroundBrush(QColor(Color.ELEVATED))
         self._draw_junction()
 
     def _draw_junction(self) -> None:
-        self.addRect(self.sceneRect(), QPen(Qt.PenStyle.NoPen), QBrush(QColor("#111820")))
+        self.addRect(self.sceneRect(), QPen(Qt.PenStyle.NoPen), QBrush(QColor(Color.ELEVATED)))
         road = QBrush(QColor(Color.ROAD))
         no_pen = QPen(Qt.PenStyle.NoPen)
         self.addRect(QRectF(self.CX - self.ROAD_HALF, 0, self.ROAD_HALF * 2, self.HEIGHT), no_pen, road)

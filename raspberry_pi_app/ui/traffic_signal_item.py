@@ -43,8 +43,8 @@ class TrafficSignalItem(QGraphicsObject):
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(halo)
                 painter.drawEllipse(QRectF(-20, y - 20, 40, 40))
-        painter.setPen(QPen(QColor(Color.BORDER), 2))
-        painter.setBrush(QColor("#111820"))
+        painter.setPen(QPen(QColor("#334155"), 2))
+        painter.setBrush(QColor("#1E293B"))
         painter.drawRoundedRect(QRectF(-16, -44, 32, 80), 8, 8)
         for y, state in positions:
             painter.setPen(QPen(QColor("#090D11"), 1.5))

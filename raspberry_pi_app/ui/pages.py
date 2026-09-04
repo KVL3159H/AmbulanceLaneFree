@@ -136,7 +136,7 @@ class EmergencyQueuePage(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole + 1, request.status.value)
                 item.setData(Qt.ItemDataRole.UserRole + 2, request.trip_id == active_trip)
                 if column == 4: item.setForeground(QColor(colours[request.priority.value]))
-                if request.trip_id == active_trip: item.setBackground(QColor("#1D4A4A"))
+                if request.trip_id == active_trip: item.setBackground(QColor("#DBEAFE"))
                 self.table.setItem(row, column, item)
         self._update_actions()
 

@@ -46,7 +46,7 @@ class PriorityQueuePanel(QFrame):
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, request.trip_id)
                 if column == 3: item.setForeground(QColor(tones[request.priority.value]))
-                if request.trip_id == selected_trip: item.setBackground(QColor("#1D4A4A"))
+                if request.trip_id == selected_trip: item.setBackground(QColor("#DBEAFE"))
                 if column in {0, 4, 5, 6}: item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.table.setItem(row, column, item)
 
