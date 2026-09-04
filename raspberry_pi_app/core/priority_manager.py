@@ -11,13 +11,16 @@ class PriorityManager:
     def __init__(self, waiting_protection_seconds: float = 30.0) -> None:
         self.waiting_protection_seconds = max(1.0, waiting_protection_seconds)
         self._requests: dict[str, PriorityRequest] = {}
+        self._held: dict[str, PriorityRequest] = {}
 
     def add_or_update(self, assessment: GPSAssessment, now: datetime | None = None) -> PriorityRequest:
         if not assessment.eligible or assessment.approach is None or assessment.distance_metres is None:
             raise ValueError("only eligible GPS assessments may enter the priority queue")
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         packet = assessment.packet
-        request = self._requests.get(packet.trip_id)
+        # A held request continues receiving telemetry, but must remain out of
+        # automatic selection until an operator restores it.
+        request = self._requests.get(packet.trip_id) or self._held.get(packet.trip_id)
         if request is None:
             request = PriorityRequest(
                 ambulance_id=packet.ambulance_id,
@@ -44,13 +47,34 @@ class PriorityManager:
         return request
 
     def remove(self, trip_id: str, status: RequestStatus = RequestStatus.CANCELLED) -> PriorityRequest | None:
-        request = self._requests.pop(trip_id, None)
+        request = self._requests.pop(trip_id, None) or self._held.pop(trip_id, None)
         if request:
             request.status = status
         return request
 
     def get(self, trip_id: str) -> PriorityRequest | None:
-        return self._requests.get(trip_id)
+        return self._requests.get(trip_id) or self._held.get(trip_id)
+
+    def hold(self, trip_id: str) -> bool:
+        """Hold a waiting request without affecting an active preemption."""
+        request = self._requests.get(trip_id)
+        if request is None or request.status is RequestStatus.ACTIVE:
+            return False
+        self._requests.pop(trip_id)
+        request.status = RequestStatus.HELD
+        self._held[trip_id] = request
+        return True
+
+    def restore(self, trip_id: str) -> bool:
+        request = self._held.pop(trip_id, None)
+        if request is None:
+            return False
+        request.status = RequestStatus.WAITING
+        self._requests[trip_id] = request
+        return True
+
+    def all_requests(self) -> list[PriorityRequest]:
+        return [*self.ordered(), *sorted(self._held.values(), key=lambda item: item.first_requested_at)]
 
     def ordered(self, now: datetime | None = None) -> list[PriorityRequest]:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -75,10 +99,11 @@ class PriorityManager:
         return ordered[0] if ordered else None
 
     def __len__(self) -> int:
-        return len(self._requests)
+        return len(self._requests) + len(self._held)
 
     def clear(self) -> None:
         self._requests.clear()
+        self._held.clear()
 
     def mark_active(self, trip_id: str) -> PriorityRequest | None:
         request = self._requests.get(trip_id)

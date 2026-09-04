@@ -13,7 +13,7 @@ def ambulance_cancel(prefix: str, ambulance_id: str = "+") -> str:
     return f"{prefix}/ambulance/{ambulance_id}/cancel"
 
 
-def ambulance_status(prefix: str, ambulance_id: str) -> str:
+def ambulance_status(prefix: str, ambulance_id: str = "+") -> str:
     return f"{prefix}/ambulance/{ambulance_id}/status"
 
 

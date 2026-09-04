@@ -49,6 +49,8 @@ def parse_args(bundle_dir: Path, working_dir: Path) -> argparse.Namespace:
     parser.add_argument("--database", type=Path, default=default_db, help="Path to SQLite database")
     parser.add_argument("--headless-smoke-test", action="store_true", help="Run automated offscreen smoke test")
     parser.add_argument("--screenshot", type=Path, help="Save screenshot when smoke test completes")
+    parser.add_argument("--window-size", choices=["1440x900", "1100x700"], default="1440x900", help="Smoke-test viewport")
+    parser.add_argument("--fullscreen-smoke", action="store_true", help="Exercise full-screen mode during the smoke test")
     return parser.parse_args()
 
 
@@ -110,13 +112,16 @@ def main() -> int:
     app = QApplication(sys.argv[:1])
     app.setApplicationName("LifeLane")
     app.setOrganizationName("LifeLane")
-    app.setApplicationDisplayName("LifeLane Traffic Signal Preemption")
+    if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")
 
     # Set Window and Application Icon
     icon_paths = [
+        bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "app-icon.svg",
         bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.ico",
         bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.png",
         working_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.ico",
+        working_dir / "raspberry_pi_app" / "resources" / "icons" / "app-icon.svg",
     ]
     for p in icon_paths:
         if p.exists():
@@ -125,6 +130,9 @@ def main() -> int:
             break
 
     window = MainWindow(config, repository)
+    if args.headless_smoke_test:
+        width, height = (int(part) for part in args.window_size.split("x"))
+        window.resize(width, height)
 
     # Ensure window icon is explicitly set on the main window instance
     for p in icon_paths:
@@ -132,12 +140,21 @@ def main() -> int:
             window.setWindowIcon(QIcon(str(p)))
             break
 
-    window.show()
+    if not args.headless_smoke_test:
+        window.showMaximized()
+    else:
+        window.show()
 
     if args.headless_smoke_test:
         from raspberry_pi_app.core.models import Approach
 
+        window.enable_simulation_mode()
         window.start_simulation(Approach.NORTH)
+        window.simulations[-1].signed_distance_metres = 145.0
+        window.start_simulation(Approach.EAST, "SIM-SECOND")
+        window.simulations[-1].signed_distance_metres = 210.0
+        if args.fullscreen_smoke:
+            window.showFullScreen()
 
         def finish_smoke_test() -> None:
             if args.screenshot:
@@ -146,7 +163,7 @@ def main() -> int:
             window.close()
             app.quit()
 
-        QTimer.singleShot(1800, finish_smoke_test)
+        QTimer.singleShot(2400, finish_smoke_test)
 
     return app.exec()
 

@@ -14,6 +14,7 @@ import android.os.IBinder
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
@@ -39,7 +40,15 @@ class EmergencyLocationService : Service() {
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            result.lastLocation?.let(::publishLocation)
+            val location = result.lastLocation
+            if (location == null) TripStatusRepository.update { it.copy(gpsStatus = "Waiting for GPS signal") }
+            else publishLocation(location)
+        }
+
+        override fun onLocationAvailability(availability: LocationAvailability) {
+            if (!availability.isLocationAvailable) {
+                TripStatusRepository.update { current -> current.copy(gpsStatus = "GPS signal unavailable") }
+            }
         }
     }
 
@@ -50,6 +59,7 @@ class EmergencyLocationService : Service() {
             ACTION_START -> startEmergency(intent)
             ACTION_COMPLETE -> stopEmergency(cancelled = false)
             ACTION_CANCEL -> stopEmergency(cancelled = true)
+            ACTION_RETRY -> retryConnections()
         }
         return START_NOT_STICKY
     }
@@ -82,10 +92,15 @@ class EmergencyLocationService : Service() {
             { state -> TripStatusRepository.update { it.copy(mqttStatus = state) } },
             { json ->
                 val selected = json.optString("selectedAmbulance", "")
+                val junctionRequest = json.optString("requestStatus", "Waiting")
                 TripStatusRepository.update {
                     it.copy(
                         signalStatus = json.optString("signalState", "Unknown"),
-                        requestStatus = if (selected == ambulanceId) "Selected" else json.optString("requestStatus", "Waiting"),
+                        requestStatus = when {
+                            selected == ambulanceId -> junctionRequest.ifBlank { "Selected" }
+                            selected.isNotBlank() -> "Waiting in queue"
+                            else -> junctionRequest
+                        },
                     )
                 }
             },
@@ -98,13 +113,16 @@ class EmergencyLocationService : Service() {
                 put("timestamp", Instant.now().toString())
             }.toString(),
         )
+        requestGpsUpdates()
+    }
+
+    private fun requestGpsUpdates() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-        ) {
-            TripStatusRepository.update { it.copy(gpsStatus = "Location permission denied") }
-            stopEmergency(cancelled = true)
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            TripStatusRepository.update { it.copy(gpsStatus = "Location permission denied", emergencyActive = true) }
             return
         }
+        fused.removeLocationUpdates(callback)
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_500L)
             .setMinUpdateIntervalMillis(1_000L)
             .build()
@@ -113,7 +131,12 @@ class EmergencyLocationService : Service() {
     }
 
     private fun publishLocation(location: Location) {
-        if (!::ambulanceId.isInitialized || !validLocation(location)) return
+        if (!::ambulanceId.isInitialized) return
+        if (!validLocation(location)) {
+            val status = if (!location.hasAccuracy()) "GPS accuracy unavailable" else "GPS inaccurate (${location.accuracy.toInt()} m)"
+            TripStatusRepository.update { it.copy(gpsStatus = status, accuracyMetres = if (location.hasAccuracy()) location.accuracy else it.accuracyMetres) }
+            return
+        }
         val distance = distanceMetres(location.latitude, location.longitude, JUNCTION_LAT, JUNCTION_LON)
         val relativeBearing = bearing(JUNCTION_LAT, JUNCTION_LON, location.latitude, location.longitude)
         val approach = when {
@@ -154,6 +177,13 @@ class EmergencyLocationService : Service() {
         location.latitude in -90.0..90.0 && location.longitude in -180.0..180.0 &&
             location.hasAccuracy() && location.accuracy in 0f..100f
 
+    private fun retryConnections() {
+        if (!::ambulanceId.isInitialized) return
+        TripStatusRepository.update { it.copy(mqttStatus = "Connecting", gpsStatus = "Acquiring GPS") }
+        mqtt?.reconnect()
+        requestGpsUpdates()
+    }
+
     private fun stopEmergency(cancelled: Boolean) {
         fused.removeLocationUpdates(callback)
         if (::ambulanceId.isInitialized) {
@@ -185,6 +215,7 @@ class EmergencyLocationService : Service() {
         const val ACTION_START = "org.lifelane.START"
         const val ACTION_COMPLETE = "org.lifelane.COMPLETE"
         const val ACTION_CANCEL = "org.lifelane.CANCEL"
+        const val ACTION_RETRY = "org.lifelane.RETRY"
         const val EXTRA_AMBULANCE_ID = "ambulanceId"
         const val EXTRA_TRIP_ID = "tripId"
         const val EXTRA_PRIORITY = "priority"

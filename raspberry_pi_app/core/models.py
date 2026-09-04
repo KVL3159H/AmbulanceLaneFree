@@ -27,6 +27,7 @@ class PatientPriority(str, Enum):
 
 class RequestStatus(str, Enum):
     WAITING = "WAITING"
+    HELD = "HELD"
     SELECTED = "SELECTED"
     ACTIVE = "ACTIVE"
     PASSED = "PASSED"

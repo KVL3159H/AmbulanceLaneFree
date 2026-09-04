@@ -7,6 +7,8 @@ project_root = Path.cwd()
 datas = [
     (str(project_root / "config" / "junction.yaml"), "config"),
     (str(project_root / "raspberry_pi_app" / "resources" / "icons" / "*"), "raspberry_pi_app/resources/icons"),
+    (str(project_root / "raspberry_pi_app" / "resources" / "logo" / "*"), "raspberry_pi_app/resources/logo"),
+    (str(project_root / "raspberry_pi_app" / "ui" / "styles.qss"), "raspberry_pi_app/ui"),
 ]
 
 hiddenimports = [
@@ -36,6 +38,9 @@ hiddenimports = [
     "raspberry_pi_app.simulator.gps_simulator",
     "raspberry_pi_app.simulator.ambulance_factory",
     "raspberry_pi_app.ui.main_window",
+    "raspberry_pi_app.ui.components",
+    "raspberry_pi_app.ui.pages",
+    "raspberry_pi_app.ui.theme",
     "raspberry_pi_app.ui.junction_scene",
     "raspberry_pi_app.ui.traffic_signal_item",
     "raspberry_pi_app.ui.ambulance_item",

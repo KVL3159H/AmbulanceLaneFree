@@ -3,6 +3,7 @@ package org.lifelane.mobile
 import android.app.Application
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.Instant
@@ -13,7 +14,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class TripViewModel(application: Application) : AndroidViewModel(application) {
-    private val _state = MutableStateFlow(TripUiState())
+    private val preferences = application.getSharedPreferences("lifelane_driver", 0)
+    private val rememberedAmbulance = preferences.getString("ambulance_id", "").orEmpty()
+    private val recentHospitals = preferences.getStringSet("recent_hospitals", emptySet()).orEmpty().toList().sorted()
+    private val _state = MutableStateFlow(TripUiState(ambulanceId = rememberedAmbulance, recentHospitals = recentHospitals))
     val state = _state.asStateFlow()
 
     init {
@@ -38,37 +42,66 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun login(driverId: String) {
-        if (driverId.isBlank()) {
-            _state.value = _state.value.copy(message = "Enter a driver ID")
-        } else {
-            _state.value = _state.value.copy(driverId = driverId.trim(), screen = AppScreen.AMBULANCE, message = null)
+    fun finishSplash() { _state.value = _state.value.copy(screen = AppScreen.LOGIN) }
+
+    fun login(driverId: String, pin: String, remember: Boolean) {
+        val message = when {
+            driverId.isBlank() -> "Enter your authorized driver ID."
+            pin.length < 4 -> "Enter a PIN of at least four digits."
+            pin.any { !it.isDigit() } -> "PIN must contain digits only."
+            else -> null
         }
+        if (message != null) {
+            _state.value = _state.value.copy(message = message)
+            return
+        }
+        _state.value = _state.value.copy(driverId = driverId.trim(), rememberAmbulance = remember, screen = AppScreen.AMBULANCE, message = null)
     }
 
     fun selectAmbulance(id: String) {
-        _state.value = _state.value.copy(ambulanceId = id, screen = AppScreen.PICKUP)
+        if (_state.value.rememberAmbulance) preferences.edit { putString("ambulance_id", id) }
+        else preferences.edit { remove("ambulance_id") }
+        _state.value = _state.value.copy(ambulanceId = id, screen = AppScreen.PRIORITY, priority = null, condition = null, destination = "", message = null)
     }
 
-    fun confirmPickup() { _state.value = _state.value.copy(screen = AppScreen.PRIORITY) }
-    fun setPriority(value: PatientPriority) { _state.value = _state.value.copy(priority = value, screen = AppScreen.CONDITION) }
-    fun setCondition(value: PatientCondition) { _state.value = _state.value.copy(condition = value, screen = AppScreen.DESTINATION) }
-    fun setDestination(value: String) {
-        if (value.isBlank()) _state.value = _state.value.copy(message = "Enter a destination hospital")
-        else _state.value = _state.value.copy(destination = value.trim(), message = null)
+    fun setPriority(value: PatientPriority) { _state.value = _state.value.copy(priority = value, message = null) }
+    fun continueFromPriority() {
+        _state.value = if (_state.value.priority == null) _state.value.copy(message = "Select a medical priority before continuing.")
+        else _state.value.copy(screen = AppScreen.CONDITION, message = null)
     }
+
+    fun setCondition(value: PatientCondition) { _state.value = _state.value.copy(condition = value, message = null) }
+    fun continueFromCondition() {
+        _state.value = if (_state.value.condition == null) _state.value.copy(message = "Select the reported patient condition.")
+        else _state.value.copy(screen = AppScreen.DESTINATION, message = null)
+    }
+
+    fun setDestination(value: String) { _state.value = _state.value.copy(destination = value, message = null) }
+    fun reviewTrip() {
+        _state.value = if (_state.value.destination.isBlank()) _state.value.copy(message = "Enter a destination hospital.")
+        else _state.value.copy(destination = _state.value.destination.trim(), screen = AppScreen.CONFIRM, message = null)
+    }
+
+    fun useRecentHospital(value: String) { _state.value = _state.value.copy(destination = value, message = null) }
 
     fun startTrip() {
         val current = _state.value
-        if (current.destination.isBlank()) return
+        val priority = current.priority ?: return
+        val condition = current.condition ?: return
+        if (current.destination.isBlank() || current.ambulanceId.isBlank()) return
         val tripId = "TRIP-${UUID.randomUUID().toString().take(8).uppercase()}"
+        val hospitals = (current.recentHospitals + current.destination).distinct().takeLast(5)
+        preferences.edit { putStringSet("recent_hospitals", hospitals.toSet()) }
         val started = current.copy(
             tripId = tripId,
             emergencyActive = true,
             startTime = Instant.now(),
             screen = AppScreen.EMERGENCY,
-            gpsStatus = "Starting",
+            gpsStatus = "Acquiring GPS",
             mqttStatus = "Connecting",
+            requestStatus = "Not requested",
+            signalStatus = "Awaiting junction status",
+            recentHospitals = hospitals,
         )
         _state.value = started
         TripStatusRepository.update { started }
@@ -76,8 +109,8 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
             action = EmergencyLocationService.ACTION_START
             putExtra(EmergencyLocationService.EXTRA_AMBULANCE_ID, started.ambulanceId)
             putExtra(EmergencyLocationService.EXTRA_TRIP_ID, started.tripId)
-            putExtra(EmergencyLocationService.EXTRA_PRIORITY, started.priority.name)
-            putExtra(EmergencyLocationService.EXTRA_CONDITION, started.condition.name)
+            putExtra(EmergencyLocationService.EXTRA_PRIORITY, priority.name)
+            putExtra(EmergencyLocationService.EXTRA_CONDITION, condition.name)
             putExtra(EmergencyLocationService.EXTRA_DESTINATION, started.destination)
         }
         ContextCompat.startForegroundService(getApplication(), intent)
@@ -88,17 +121,29 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     fun requestDelivery() { _state.value = _state.value.copy(screen = AppScreen.DELIVER_CONFIRM) }
     fun requestCancel() { _state.value = _state.value.copy(screen = AppScreen.CANCEL_CONFIRM) }
     fun dismissConfirmation() { _state.value = _state.value.copy(screen = AppScreen.EMERGENCY) }
+    fun backTo(screen: AppScreen) { _state.value = _state.value.copy(screen = screen, message = null) }
+
+    fun retryConnections() {
+        getApplication<Application>().startService(Intent(getApplication(), EmergencyLocationService::class.java).apply {
+            action = EmergencyLocationService.ACTION_RETRY
+        })
+    }
+
+    fun reportPermissionDenied() {
+        _state.value = _state.value.copy(message = "Precise location permission is required before an emergency route can start.")
+    }
 
     fun stopTrip(cancelled: Boolean) {
-        val intent = Intent(getApplication(), EmergencyLocationService::class.java).apply {
+        getApplication<Application>().startService(Intent(getApplication(), EmergencyLocationService::class.java).apply {
             action = if (cancelled) EmergencyLocationService.ACTION_CANCEL else EmergencyLocationService.ACTION_COMPLETE
-        }
-        getApplication<Application>().startService(intent)
+        })
         _state.value = TripUiState(
             screen = AppScreen.AMBULANCE,
             driverId = _state.value.driverId,
             ambulanceId = _state.value.ambulanceId,
-            message = if (cancelled) "Emergency cancelled" else "Patient delivery recorded",
+            rememberAmbulance = _state.value.rememberAmbulance,
+            recentHospitals = _state.value.recentHospitals,
+            message = if (cancelled) "Emergency cancelled and transmissions stopped." else "Trip completed and transmissions stopped.",
         )
     }
 }

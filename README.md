@@ -4,11 +4,12 @@ LifeLane is a Phase 1, software-only demonstration of a four-way traffic junctio
 
 > **Safety boundary:** LifeLane is a simulator. The included signal timings are synthetic demonstration values and are **not approved for real-road use**. There is no GPIO, relay, cabinet, or physical signal control in this project.
 
-![LifeLane native desktop application](docs/lifelane-desktop.png)
+![LifeLane native desktop application at 1440 by 900](docs/lifelane-redesign-1440x900.png)
 
 ## What is implemented
 
-- Native Qt `QGraphicsScene` four-way junction with four three-lamp heads (12 lamps), lane markings, activation/exit boundaries, and moving ambulance icons.
+- Professional native PySide6 control-room shell with five working pages, centralized QSS/tokens, accessible status badges, resizable layouts, full-screen mode, and a collapsible operational event console.
+- Native Qt `QGraphicsScene` four-way junction with four three-lamp heads (12 lamps), stop lines, zebra crossings, direction arrows, activation/exit boundaries, smooth ambulance movement and route trails.
 - Configurable NS/EW normal cycle and an Enum-based preemption FSM with yellow and all-red clearance on entry and recovery.
 - A safety invariant checked after every controller transition. A conflict forces all-red `FAIL_SAFE` and requires controlled reset.
 - Haversine distance, initial bearings, cardinal approach detection, angular wrap-around, multi-sample movement trends, rolling-median speed, ETA, stale/accuracy/authorization/sequence validation, and multi-sample passage detection.
@@ -17,7 +18,7 @@ LifeLane is a Phase 1, software-only demonstration of a four-way traffic junctio
 - Paho MQTT client with QoS 1, retained junction status, last will, reconnect backoff, environment-based credentials, and lifecycle topics.
 - SQLite storage for ambulances, trips, telemetry, and signal events using parameterized statements.
 - Rotating application logs in `logs/lifelane.log`.
-- Complete Android Studio Compose app with the requested screens, fused GPS, a foreground location service and ongoing notification, 1–2 second telemetry, MQTT reconnect/LWT/QoS 1, ViewModel, StateFlow, and coroutines.
+- Complete native Kotlin Jetpack Compose driver app with branded splash, sign-in, ambulance selection, three-step emergency creation, explicit confirmation, live emergency progression, dark/light themes, adaptive portrait/landscape layouts, TalkBack descriptions, fused GPS, foreground location service, and MQTT reconnect/LWT/QoS 1.
 - First-class Windows desktop software: one-click runners (`run_windows.bat`), taskbar icon grouping with custom `AppUserModelID`, and standalone `.exe` build via PyInstaller.
 
 ## Windows installation and standalone software (.exe)
@@ -130,7 +131,7 @@ nano .env
    ./gradlew assembleDebug
    ```
 
-7. Install `android_app/app/build/outputs/apk/debug/app-debug.apk`, open LifeLane, grant foreground location/notification permissions, complete the trip setup, and press **Start emergency trip**.
+7. Install `android_app/app/build/outputs/apk/debug/app-debug.apk`, open LifeLane, grant foreground location/notification permissions, complete the trip setup, and press **START EMERGENCY ROUTE**.
 8. In the Pi app, select **Live mobile GPS**. The connection and packet state will appear in the information/event panels.
 
 Android emulator note: use `10.0.2.2` for a broker on the development computer. A physical phone must use the Pi's LAN IP; never use `localhost` for the Pi from the phone.
@@ -159,6 +160,17 @@ android_app/            complete Gradle/Compose Android application
 tests/                  unit and integration tests
 scripts/                Windows (.bat, .ps1) and Raspberry Pi (.sh) launcher scripts
 ```
+
+## Design system and verification artifacts
+
+- Desktop tokens and styling: `raspberry_pi_app/ui/theme.py` and `raspberry_pi_app/ui/styles.qss`
+- Desktop reusable controls: `raspberry_pi_app/ui/components.py`
+- Original desktop SVG brand assets: `raspberry_pi_app/resources/logo/` and `raspberry_pi_app/resources/icons/`
+- Android tokens: `android_app/app/src/main/java/org/lifelane/mobile/ui/theme/`
+- Android reusable Compose controls: `android_app/app/src/main/java/org/lifelane/mobile/ui/components/`
+- Android Studio previews: `android_app/app/src/main/java/org/lifelane/mobile/ui/previews/LifeLanePreviews.kt`
+- Desktop captures: `docs/lifelane-redesign-1440x900.png` and `docs/lifelane-redesign-1100x700.png`
+- Verification record and exact commands: `docs/redesign-verification.md`
 
 ## Troubleshooting
 

@@ -1,4 +1,6 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#0284C7" android:pathData="M4,4h40v40h-40z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M20,9h8v11h11v8h-11v11h-8v-11h-11v-8h11z" />
+    <!-- Android notification icons are intentionally monochrome masks. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M24,4c-7.18,0 -13,5.82 -13,13c0,9.75 13,25 13,25s13,-15.25 13,-25C37,9.82 31.18,4 24,4zM24,10c3.87,0 7,3.13 7,7s-3.13,7 -7,7s-7,-3.13 -7,-7s3.13,-7 7,-7z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M22,12h4v3h3v4h-3v3h-4v-3h-3v-4h3z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M6,27h9v4H6zM33,27h9v4h-9zM2,25h4v8H2zM42,25h4v8h-4z" />
 </vector>

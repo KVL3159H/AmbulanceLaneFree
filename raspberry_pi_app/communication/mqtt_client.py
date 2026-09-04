@@ -27,12 +27,14 @@ class MQTTClient:
         cancel_callback: Callable[[str], None],
         state_callback: Callable[[str], None],
         error_callback: Callable[[str], None],
+        status_callback: Callable[[str, bool], None] | None = None,
     ) -> None:
         self.config = config
         self.packet_callback = packet_callback
         self.cancel_callback = cancel_callback
         self.state_callback = state_callback
         self.error_callback = error_callback
+        self.status_callback = status_callback
         self._lock = threading.Lock()
         self._lifecycle_sequences: dict[tuple[str, str], int] = {}
         self.client = mqtt.Client(
@@ -120,7 +122,7 @@ class MQTTClient:
         client.subscribe(ambulance_telemetry(prefix), qos=1)
         client.subscribe(ambulance_emergency(prefix), qos=1)
         client.subscribe(ambulance_cancel(prefix), qos=1)
-        client.subscribe(ambulance_status(prefix), qos=1)
+        client.subscribe(ambulance_status(prefix, "+"), qos=1)
         self.publish_status({"online": True})
         self.state_callback("CONNECTED")
 
@@ -141,6 +143,11 @@ class MQTTClient:
                     self.cancel_callback(str(data["tripId"]))
                 return
             if message.topic.endswith("/status"):
+                if self.status_callback:
+                    data = json.loads(message.payload.decode("utf-8"))
+                    ambulance_id = str(data.get("ambulanceId", ""))
+                    online = bool(data.get("online", False))
+                    self.status_callback(ambulance_id, online)
                 return
             self.packet_callback(validate_telemetry_payload(message.payload))
         except (InvalidMessage, KeyError, ValueError, UnicodeError) as exc:

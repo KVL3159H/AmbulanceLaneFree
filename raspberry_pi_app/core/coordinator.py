@@ -51,7 +51,7 @@ class LifeLaneCoordinator:
         self.gps_lost_trips.discard(packet.trip_id)
         self._event("GPS_PACKET", f"{packet.ambulance_id} sequence {packet.sequence_number} received")
         if not assessment.valid:
-            self._event("REQUEST_REJECTED", assessment.reason)
+            self._event("REQUEST_REJECTED", f"{packet.ambulance_id}: {assessment.reason}", packet.trip_id)
             return assessment
         if assessment.approach:
             self._event("APPROACH_DETECTED", f"{assessment.approach.value.title()} approach detected")
@@ -137,12 +137,12 @@ class LifeLaneCoordinator:
     def _controller_event(self, event_type: str, message: str) -> None:
         self._event(event_type, message)
 
-    def _event(self, event_type: str, message: str) -> None:
+    def _event(self, event_type: str, message: str, event_trip_id: str | None = None) -> None:
         if self.repository:
             self.repository.record_signal_event(
                 event_type,
                 message,
-                trip_id=self.controller.target_trip_id,
+                trip_id=event_trip_id if event_trip_id is not None else self.controller.target_trip_id,
                 new_state=self.controller.state.value,
             )
         self.event_callback(event_type, message)

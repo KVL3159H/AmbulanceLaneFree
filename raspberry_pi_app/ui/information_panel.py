@@ -1,72 +1,153 @@
-"""Live telemetry/status information panel."""
+"""Current signal and active-emergency presentation cards."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ..core.models import GPSAssessment
+from ..core.models import GPSAssessment, PriorityRequest
 from ..core.signal_controller import SignalController
+from ..core.signal_states import PreemptionState
+from .components import EmptyState, PriorityBadge, StatusBadge
+from .theme import Color, Space
 
 
-class InformationPanel(QGroupBox):
-    FIELD_NAMES = [
-        ("mqtt", "MQTT connection"), ("gps", "GPS connection"),
-        ("ambulance", "Ambulance ID"), ("trip", "Trip ID"),
-        ("priority", "Patient priority"), ("condition", "Reported condition"),
-        ("destination", "Destination hospital"), ("latitude", "Latitude"),
-        ("longitude", "Longitude"), ("accuracy", "GPS accuracy"),
-        ("speed", "Speed"), ("heading", "Heading"),
-        ("distance", "Distance"), ("eta", "Calculated ETA"),
-        ("approach", "Detected approach"), ("approaching", "Approaching"),
-        ("signal", "Current signal state"), ("preemption", "Preemption state"),
-        ("selected", "Selected ambulance"), ("waiting", "Waiting ambulances"),
+class ValueRow(QWidget):
+    def __init__(self, label: str, value: str = "—") -> None:
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(Space.SM)
+        caption = QLabel(label)
+        caption.setObjectName("Supporting")
+        self.value = QLabel(value)
+        self.value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.value.setWordWrap(True)
+        layout.addWidget(caption, 1)
+        layout.addWidget(self.value, 2)
+
+
+class CurrentSignalCard(QFrame):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("SectionCard")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(Space.LG, Space.LG, Space.LG, Space.LG)
+        root.setSpacing(Space.MD)
+        title = QHBoxLayout()
+        heading = QLabel("Current signal")
+        heading.setObjectName("CardTitle")
+        self.badge = StatusBadge("Normal operation", "success")
+        title.addWidget(heading)
+        title.addStretch()
+        title.addWidget(self.badge)
+        root.addLayout(title)
+        metrics = QGridLayout()
+        metrics.setHorizontalSpacing(Space.LG)
+        metrics.setVerticalSpacing(Space.SM)
+        self.phase = ValueRow("Active phase", "All-red clearance")
+        self.machine = ValueRow("State machine", "Normal")
+        self.remaining = ValueRow("Remaining timer", "—")
+        self.selected = ValueRow("Selected ambulance")
+        self.direction = ValueRow("Priority direction")
+        for index, row in enumerate((self.phase, self.machine, self.remaining, self.selected, self.direction)):
+            metrics.addWidget(row, index, 0)
+        root.addLayout(metrics)
+        self.explanation = QLabel()
+        self.explanation.setWordWrap(True)
+        self.explanation.setStyleSheet(f"color:{Color.RED}; font-weight:600;")
+        self.explanation.setAccessibleName("Fail-safe explanation")
+        self.explanation.hide()
+        root.addWidget(self.explanation)
+
+    def update_controller(self, controller: SignalController, remaining: float | None, selected_request: PriorityRequest | None = None) -> None:
+        state = controller.state
+        labels = {
+            PreemptionState.NORMAL: ("Normal operation", "success"),
+            PreemptionState.REQUEST_VALIDATION: ("Validating request", "info"),
+            PreemptionState.PREEMPTION_PENDING: ("Priority pending", "warning"),
+            PreemptionState.CLEAR_CURRENT_GREEN: ("Clearance pending", "warning"),
+            PreemptionState.ALL_RED_CLEARANCE: ("All-red clearance", "warning"),
+            PreemptionState.AMBULANCE_GREEN: ("Priority active", "critical"),
+            PreemptionState.PASSAGE_MONITORING: ("Priority active", "critical"),
+            PreemptionState.RECOVERY_YELLOW: ("Restoring normal", "warning"),
+            PreemptionState.RECOVERY_ALL_RED: ("Restoring normal", "warning"),
+            PreemptionState.RETURN_TO_NORMAL: ("Restoring normal", "info"),
+            PreemptionState.FAIL_SAFE: ("Fail-safe active", "critical"),
+        }
+        badge, tone = labels[state]
+        self.badge.set_status(badge, tone, f"Preemption state: {state.value}")
+        self.phase.value.setText(controller.normal_phase.value.replace("_", " ").title() if state is PreemptionState.NORMAL else badge)
+        self.machine.value.setText(state.value.replace("_", " ").title())
+        self.remaining.value.setText(f"{remaining:.1f} s" if remaining is not None else "Monitoring")
+        self.selected.value.setText(selected_request.ambulance_id if selected_request else "None")
+        self.direction.value.setText(controller.target_approach.value.title() if controller.target_approach else "None")
+        if state is PreemptionState.FAIL_SAFE:
+            self.explanation.setText("Safety invariant triggered. Every approach is forced red and timing is paused until a controlled reset.")
+            self.explanation.show()
+        else:
+            self.explanation.hide()
+
+
+class ActiveEmergencyCard(QFrame):
+    FIELDS = [
+        ("ambulance", "Ambulance"), ("trip", "Trip ID"), ("condition", "Condition"),
+        ("approach", "Approach"), ("distance", "Distance"), ("eta", "ETA"),
+        ("speed", "Speed"), ("accuracy", "GPS accuracy"), ("destination", "Destination"),
+        ("request", "Request status"),
     ]
 
     def __init__(self) -> None:
-        super().__init__("Live status")
-        layout = QFormLayout(self)
-        layout.setContentsMargins(10, 12, 10, 10)
-        layout.setVerticalSpacing(3)
-        self.values: dict[str, QLabel] = {}
-        for key, label in self.FIELD_NAMES:
-            value = QLabel("—")
-            value.setTextInteractionFlags(value.textInteractionFlags() | Qt.TextInteractionFlag.TextSelectableByMouse)
-            value.setStyleSheet("color:#e2e8f0;")
-            layout.addRow(label + ":", value)
-            self.values[key] = value
-        self.values["mqtt"].setText("DISCONNECTED")
-        self.values["gps"].setText("NO DATA")
+        super().__init__()
+        self.setObjectName("SectionCard")
+        self.setStyleSheet(f"QFrame#SectionCard {{ border-left: 4px solid {Color.DISABLED}; }}")
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(Space.LG, Space.LG, Space.LG, Space.LG)
+        self.root.setSpacing(Space.SM)
+        title = QHBoxLayout()
+        heading = QLabel("Active emergency")
+        heading.setObjectName("CardTitle")
+        self.priority = PriorityBadge("No priority")
+        title.addWidget(heading); title.addStretch(); title.addWidget(self.priority)
+        self.root.addLayout(title)
+        self.empty = EmptyState("No active emergency", "Waiting for a valid GPS request from an authorized ambulance.")
+        self.root.addWidget(self.empty)
+        self.content = QWidget()
+        content_layout = QVBoxLayout(self.content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(Space.XS)
+        self.rows: dict[str, ValueRow] = {}
+        for key, label in self.FIELDS:
+            row = ValueRow(label)
+            self.rows[key] = row
+            content_layout.addWidget(row)
+        self.root.addWidget(self.content)
+        self.content.hide()
 
-    def set_mqtt_state(self, state: str) -> None:
-        self.values["mqtt"].setText(state)
-
-    def update_assessment(self, result: GPSAssessment) -> None:
+    def update_assessment(self, result: GPSAssessment, request: PriorityRequest | None) -> None:
         packet = result.packet
+        self.empty.hide(); self.content.show()
+        self.priority.set_priority(packet.patient_priority.value)
+        colour = {"RED": Color.RED, "YELLOW": Color.AMBER, "GREEN": Color.GREEN}[packet.patient_priority.value]
+        self.setStyleSheet(f"QFrame#SectionCard {{ border-left: 4px solid {colour}; }}")
         values = {
-            "gps": "VALID" if result.valid else f"REJECTED: {result.reason}",
             "ambulance": packet.ambulance_id,
             "trip": packet.trip_id,
-            "priority": packet.patient_priority.value,
             "condition": packet.patient_condition.replace("_", " ").title(),
-            "destination": packet.destination_hospital,
-            "latitude": f"{packet.latitude:.6f}",
-            "longitude": f"{packet.longitude:.6f}",
-            "accuracy": f"{packet.accuracy_metres:.1f} m",
-            "speed": f"{packet.speed_mps:.1f} m/s",
-            "heading": f"{packet.heading_degrees:.0f}°",
-            "distance": f"{result.distance_metres:.1f} m" if result.distance_metres is not None else "—",
+            "approach": result.approach.value.title() if result.approach else "Not detected",
+            "distance": f"{result.distance_metres:.0f} m" if result.distance_metres is not None else "Unavailable",
             "eta": f"{result.eta_seconds:.1f} s" if result.eta_seconds is not None else "Unavailable",
-            "approach": result.approach.value if result.approach else "—",
-            "approaching": "YES" if result.approaching else "NO",
+            "speed": f"{packet.speed_mps:.1f} m/s",
+            "accuracy": f"{packet.accuracy_metres:.1f} m",
+            "destination": packet.destination_hospital,
+            "request": request.status.value.replace("_", " ").title() if request else result.reason,
         }
-        for key, value in values.items():
-            self.values[key].setText(value)
+        for key, value in values.items(): self.rows[key].value.setText(value)
 
-    def update_controller(self, controller: SignalController, waiting: int) -> None:
-        self.values["signal"].setText(
-            " / ".join(f"{side.value[0]}:{colour.value[0]}" for side, colour in controller.signals.items())
-        )
-        self.values["preemption"].setText(controller.state.value)
-        self.values["selected"].setText(controller.target_trip_id or "—")
-        self.values["waiting"].setText(str(waiting))
+    def show_gps_loss(self) -> None:
+        if self.content.isVisible():
+            self.rows["request"].value.setText("GPS lost — safe timeout active")
+
+    def clear_active(self) -> None:
+        self.content.hide(); self.empty.show(); self.setStyleSheet(f"QFrame#SectionCard {{ border-left: 4px solid {Color.DISABLED}; }}")

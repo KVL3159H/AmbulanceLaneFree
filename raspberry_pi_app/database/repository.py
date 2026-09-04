@@ -90,3 +90,69 @@ class Repository:
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
+
+    def list_trips(self, search: str = "", status: str = "", priority: str = "", limit: int = 250):
+        clauses: list[str] = []
+        values: list[object] = []
+        if search:
+            clauses.append("(t.trip_id LIKE ? OR t.ambulance_id LIKE ? OR t.destination LIKE ? OR t.condition LIKE ?)")
+            token = f"%{search}%"
+            values.extend([token, token, token, token])
+        if status:
+            clauses.append("t.status = ?")
+            values.append(status)
+        if priority:
+            clauses.append("t.priority = ?")
+            values.append(priority)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        values.append(max(1, min(limit, 1000)))
+        return self.connection.execute(
+            f"""SELECT t.*,
+                (SELECT MIN(timestamp) FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_GREEN') AS green_time,
+                (SELECT MIN(timestamp) FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_SELECTED') AS selected_time,
+                (SELECT reason FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_SELECTED'
+                 ORDER BY timestamp ASC LIMIT 1) AS selected_reason
+                FROM trips t {where} ORDER BY t.start_time DESC LIMIT ?""",
+            values,
+        ).fetchall()
+
+    def recent_warnings(self, limit: int = 8):
+        return self.connection.execute(
+            """SELECT event_type, reason, timestamp FROM signal_events
+               WHERE event_type LIKE '%ERROR%' OR event_type LIKE '%LOST%'
+                  OR event_type LIKE '%REJECTED%' OR event_type LIKE '%CRITICAL%'
+               ORDER BY timestamp DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+    def recent_request_outcomes(self, limit: int = 40) -> list[dict[str, object]]:
+        """Return completed/cancelled trips and GPS-rejected request attempts."""
+        completed = [dict(row) for row in self.connection.execute(
+            """SELECT t.trip_id, t.ambulance_id, t.priority, t.status AS outcome,
+                      COALESCE(t.end_time, t.start_time) AS occurred, '' AS reason,
+                      (SELECT MIN(timestamp) FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_GREEN') AS green_time,
+                      (SELECT MIN(timestamp) FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_SELECTED') AS selected_time,
+                      (SELECT reason FROM signal_events s WHERE s.trip_id=t.trip_id AND s.event_type='AMBULANCE_SELECTED'
+                       ORDER BY timestamp ASC LIMIT 1) AS selected_reason
+               FROM trips t WHERE t.status <> 'ACTIVE' ORDER BY occurred DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()]
+        rejected = [dict(row) for row in self.connection.execute(
+            """SELECT COALESCE(e.trip_id, '—') AS trip_id,
+                      CASE WHEN instr(e.reason, ':') > 0 THEN substr(e.reason, 1, instr(e.reason, ':') - 1) ELSE 'Unknown' END AS ambulance_id,
+                      COALESCE(t.priority, '—') AS priority, 'REJECTED' AS outcome,
+                      e.timestamp AS occurred, e.reason AS reason, NULL AS green_time,
+                      NULL AS selected_time, NULL AS selected_reason
+               FROM signal_events e LEFT JOIN trips t ON t.trip_id=e.trip_id
+               WHERE e.event_type='REQUEST_REJECTED' ORDER BY e.timestamp DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()]
+        return sorted(completed + rejected, key=lambda row: str(row.get("occurred") or ""), reverse=True)[:limit]
+
+    def health_check(self) -> tuple[bool, str]:
+        try:
+            result = self.connection.execute("PRAGMA quick_check").fetchone()
+            message = str(result[0]) if result else "No result"
+            return message.lower() == "ok", message
+        except Exception as exc:  # pragma: no cover - depends on external database state
+            return False, str(exc)

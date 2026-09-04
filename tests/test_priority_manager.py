@@ -76,3 +76,15 @@ def test_two_simultaneous_ambulances_are_deterministic(config, packet_factory):
         request.eta_seconds = 10
         request.first_requested_at = now
     assert [request.ambulance_id for request in manager.ordered(now)] == ["AMB-001", "AMB-002"]
+
+
+def test_held_request_stays_out_of_selection_during_gps_updates(config, packet_factory):
+    now = datetime.now(timezone.utc)
+    manager, engine = PriorityManager(999), GPSEngine(config)
+    add(manager, engine, packet_factory(ambulance_id="AMB-002", trip_id="HELD"), now)
+    assert manager.hold("HELD")
+    add(manager, engine, packet_factory(sequence=3, distance=150, ambulance_id="AMB-002", trip_id="HELD", timestamp=now + timedelta(seconds=2)), now + timedelta(seconds=2))
+    assert manager.next_request(now + timedelta(seconds=2)) is None
+    assert len(manager.all_requests()) == 1
+    assert manager.restore("HELD")
+    assert manager.next_request(now + timedelta(seconds=2)).trip_id == "HELD"

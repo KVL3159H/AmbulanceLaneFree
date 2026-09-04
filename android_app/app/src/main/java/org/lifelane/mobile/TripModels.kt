@@ -12,17 +12,19 @@ enum class PatientCondition(val label: String) {
 }
 
 enum class AppScreen {
-    LOGIN, AMBULANCE, PICKUP, PRIORITY, CONDITION, DESTINATION,
+    SPLASH, LOGIN, AMBULANCE, PRIORITY, CONDITION, DESTINATION, CONFIRM,
     EMERGENCY, LIVE_GPS, DELIVER_CONFIRM, CANCEL_CONFIRM
 }
 
 data class TripUiState(
-    val screen: AppScreen = AppScreen.LOGIN,
+    val screen: AppScreen = AppScreen.SPLASH,
     val driverId: String = "",
-    val ambulanceId: String = "AMB-001",
+    val ambulanceId: String = "",
+    val rememberAmbulance: Boolean = false,
+    val recentHospitals: List<String> = emptyList(),
     val tripId: String = "",
-    val priority: PatientPriority = PatientPriority.RED,
-    val condition: PatientCondition = PatientCondition.CARDIAC,
+    val priority: PatientPriority? = null,
+    val condition: PatientCondition? = null,
     val destination: String = "",
     val emergencyActive: Boolean = false,
     val startTime: Instant? = null,
@@ -35,8 +37,8 @@ data class TripUiState(
     val mqttStatus: String = "Disconnected",
     val nextJunction: String = "LifeLane Demo Junction",
     val distanceMetres: Double? = null,
-    val detectedApproach: String = "—",
+    val detectedApproach: String = "Not detected",
     val requestStatus: String = "Not requested",
-    val signalStatus: String = "Unknown",
+    val signalStatus: String = "Awaiting junction status",
     val message: String? = null,
 )
