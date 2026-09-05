@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,8 +22,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -30,12 +33,14 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.LocalHospital
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,13 +48,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -57,6 +62,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,12 +72,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.delay
+import org.lifelane.mobile.ui.components.CheckMarkState
 import org.lifelane.mobile.ui.components.ConditionChip
 import org.lifelane.mobile.ui.components.ConfirmationBottomSheet
 import org.lifelane.mobile.ui.components.ConnectionBadge
@@ -79,11 +88,14 @@ import org.lifelane.mobile.ui.components.EmergencyStatusCard
 import org.lifelane.mobile.ui.components.EmptyState
 import org.lifelane.mobile.ui.components.LifeLaneBrand
 import org.lifelane.mobile.ui.components.LifeLaneTopBar
+import org.lifelane.mobile.ui.components.LiveLocationRadarBanner
 import org.lifelane.mobile.ui.components.LiveMetricCard
 import org.lifelane.mobile.ui.components.LoadingState
 import org.lifelane.mobile.ui.components.PrimaryActionButton
 import org.lifelane.mobile.ui.components.PriorityCard
 import org.lifelane.mobile.ui.components.WarningBanner
+import org.lifelane.mobile.ui.components.WhatsAppCheckMarks
+import org.lifelane.mobile.ui.components.WhatsAppSecurityBanner
 import org.lifelane.mobile.ui.theme.ActiveGreen
 import org.lifelane.mobile.ui.theme.EmergencyRed
 import org.lifelane.mobile.ui.theme.InformationBlue
@@ -91,6 +103,10 @@ import org.lifelane.mobile.ui.theme.LifeLaneDimens
 import org.lifelane.mobile.ui.theme.LifeLaneTheme
 import org.lifelane.mobile.ui.theme.PrimaryTeal
 import org.lifelane.mobile.ui.theme.WarningAmber
+import org.lifelane.mobile.ui.theme.WhatsAppBlueTick
+import org.lifelane.mobile.ui.theme.WhatsAppShapes
+import org.lifelane.mobile.ui.theme.WhatsAppTokens
+import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,7 +118,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LifeLaneApp(vm: TripViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var darkTheme by rememberSaveable { mutableStateOf(true) }
+    var darkTheme by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true) vm.startTrip()
@@ -118,45 +134,49 @@ fun LifeLaneApp(vm: TripViewModel = viewModel()) {
             permissionLauncher.launch(permissions.toTypedArray())
         }
     }
+
     LifeLaneTheme(darkTheme) {
         if (state.screen == AppScreen.SPLASH) {
             SplashScreen(vm::finishSplash)
             return@LifeLaneTheme
         }
         val title = when (state.screen) {
-            AppScreen.LOGIN -> "Driver sign-in"
-            AppScreen.AMBULANCE -> "Select ambulance"
-            AppScreen.PRIORITY, AppScreen.CONDITION -> "Patient details"
-            AppScreen.DESTINATION -> "Destination"
-            AppScreen.CONFIRM -> "Confirm emergency route"
-            AppScreen.EMERGENCY, AppScreen.DELIVER_CONFIRM, AppScreen.CANCEL_CONFIRM -> "Emergency route"
-            AppScreen.LIVE_GPS -> "Live GPS"
+            AppScreen.LOGIN -> "Driver Sign-In"
+            AppScreen.AMBULANCE -> "Select Ambulance"
+            AppScreen.PRIORITY, AppScreen.CONDITION -> "Patient Urgency"
+            AppScreen.DESTINATION -> "Destination Hospital"
+            AppScreen.CONFIRM -> "Confirm Emergency Route"
+            AppScreen.EMERGENCY, AppScreen.DELIVER_CONFIRM, AppScreen.CANCEL_CONFIRM -> "Emergency Dispatch"
+            AppScreen.LIVE_GPS -> "Live Telemetry"
             else -> "LifeLane"
         }
-        Scaffold(topBar = { LifeLaneTopBar(title, darkTheme, { darkTheme = !darkTheme }) }) { padding ->
+        Scaffold(
+            topBar = { LifeLaneTopBar(title, darkTheme, { darkTheme = !darkTheme }) },
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when (state.screen) {
-                    AppScreen.LOGIN -> LoginScreen(state, vm)
-                    AppScreen.AMBULANCE -> AmbulanceScreen(state, vm)
-                    AppScreen.PRIORITY -> PriorityScreen(state, vm)
-                    AppScreen.CONDITION -> ConditionScreen(state, vm)
-                    AppScreen.DESTINATION -> DestinationScreen(state, vm)
-                    AppScreen.CONFIRM -> TripConfirmationScreen(state, vm, requestLocationAndStart)
-                    AppScreen.EMERGENCY -> ActiveEmergencyScreen(state, vm)
-                    AppScreen.LIVE_GPS -> LiveGpsScreen(state, vm)
+                    AppScreen.LOGIN -> LoginScreen(state, vm, darkTheme)
+                    AppScreen.AMBULANCE -> AmbulanceScreen(state, vm, darkTheme)
+                    AppScreen.PRIORITY -> PriorityScreen(state, vm, darkTheme)
+                    AppScreen.CONDITION -> ConditionScreen(state, vm, darkTheme)
+                    AppScreen.DESTINATION -> DestinationScreen(state, vm, darkTheme)
+                    AppScreen.CONFIRM -> TripConfirmationScreen(state, vm, darkTheme, requestLocationAndStart)
+                    AppScreen.EMERGENCY -> ActiveEmergencyScreen(state, vm, darkTheme)
+                    AppScreen.LIVE_GPS -> LiveGpsScreen(state, vm, darkTheme)
                     AppScreen.DELIVER_CONFIRM -> {
-                        ActiveEmergencyScreen(state, vm)
+                        ActiveEmergencyScreen(state, vm, darkTheme)
                         ConfirmationBottomSheet(
                             "Complete emergency trip?",
-                            "GPS transmission and the MQTT emergency session will stop. The trip result will remain in junction history.",
+                            "GPS transmission and the MQTT emergency preemption session will complete. The result remains in junction history.",
                             "Complete Trip", false, { vm.stopTrip(false) }, vm::dismissConfirmation,
                         )
                     }
                     AppScreen.CANCEL_CONFIRM -> {
-                        ActiveEmergencyScreen(state, vm)
+                        ActiveEmergencyScreen(state, vm, darkTheme)
                         ConfirmationBottomSheet(
-                            "Cancel emergency?",
-                            "Use this only when the emergency route is no longer required. The junction will safely restore normal operation.",
+                            "Cancel emergency preemption?",
+                            "Use this only if emergency transport is no longer needed. The junction will restore standard signal cycles.",
                             "Cancel Emergency", true, { vm.stopTrip(true) }, vm::dismissConfirmation,
                         )
                     }
@@ -171,7 +191,11 @@ fun LifeLaneApp(vm: TripViewModel = viewModel()) {
 private fun ScreenContainer(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.fillMaxWidth().widthIn(max = 820.dp).verticalScroll(rememberScrollState()).padding(LifeLaneDimens.pagePadding),
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = 820.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(LifeLaneDimens.pagePadding),
             verticalArrangement = Arrangement.spacedBy(LifeLaneDimens.large),
         ) { content() }
     }
@@ -179,31 +203,36 @@ private fun ScreenContainer(modifier: Modifier = Modifier, content: @Composable 
 
 @Composable
 private fun ScreenHeading(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(title, style = MaterialTheme.typography.displaySmall)
-        Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun MessageBanner(message: String?) {
-    message?.let { WarningBanner("Action required", it) }
+    message?.let { WarningBanner("Attention required", it) }
 }
 
 @Composable
 private fun SetupProgress(step: Int, label: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Step $step of 3", style = MaterialTheme.typography.labelMedium, color = PrimaryTeal)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Step $step of 3", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = WhatsAppVibrantGreen)
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        LinearProgressIndicator(progress = { step / 3f }, modifier = Modifier.fillMaxWidth().height(6.dp), color = PrimaryTeal)
+        LinearProgressIndicator(
+            progress = { step / 3f },
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+            color = WhatsAppVibrantGreen,
+            trackColor = WhatsAppVibrantGreen.copy(alpha = 0.18f),
+        )
     }
 }
 
 @Composable
 private fun SplashScreen(onFinished: () -> Unit) {
-    LaunchedEffect(Unit) { delay(650); onFinished() }
+    LaunchedEffect(Unit) { delay(700); onFinished() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             Modifier.fillMaxSize().semantics { contentDescription = "LifeLane loading" },
@@ -211,41 +240,88 @@ private fun SplashScreen(onFinished: () -> Unit) {
             verticalArrangement = Arrangement.Center,
         ) {
             LifeLaneBrand()
-            Spacer(Modifier.height(32.dp))
-            CircularProgressIndicator(modifier = Modifier.size(28.dp), color = PrimaryTeal, strokeWidth = 2.dp)
-            Text("Preparing secure emergency route", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(36.dp))
+            CircularProgressIndicator(modifier = Modifier.size(32.dp), color = WhatsAppVibrantGreen, strokeWidth = 3.dp)
+            Text(
+                "Establishing secure junction channel",
+                Modifier.padding(top = 16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(48.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Lock, contentDescription = null, tint = WhatsAppVibrantGreen, modifier = Modifier.size(15.dp))
+                Text("End-to-end encrypted emergency preemption", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
 
 @Composable
-private fun LoginScreen(state: TripUiState, vm: TripViewModel) {
+private fun LoginScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     var driverId by rememberSaveable { mutableStateOf(state.driverId) }
     var pin by rememberSaveable { mutableStateOf("") }
     var rememberAmbulance by rememberSaveable { mutableStateOf(state.ambulanceId.isNotBlank()) }
+
     ScreenContainer {
-        ScreenHeading("Ready for service", "Sign in before selecting an authorized ambulance.")
+        ScreenHeading("Responder Sign-In", "Sign in before operating an emergency preemption session.")
         MessageBanner(state.message)
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+        WhatsAppSecurityBanner(darkTheme = darkTheme)
+        Card(
+            shape = WhatsAppShapes.card,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        ) {
             Column(Modifier.fillMaxWidth().padding(LifeLaneDimens.cardPadding), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 LifeLaneBrand()
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                 OutlinedTextField(
-                    driverId, { driverId = it }, label = { Text("Driver ID") }, leadingIcon = { Icon(Icons.Outlined.Person, null) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    value = driverId,
+                    onValueChange = { driverId = it },
+                    label = { Text("Driver ID") },
+                    leadingIcon = { Icon(Icons.Outlined.Person, null, tint = WhatsAppVibrantGreen) },
+                    singleLine = true,
+                    shape = WhatsAppShapes.card,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WhatsAppVibrantGreen,
+                        focusedLabelColor = WhatsAppVibrantGreen,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
-                    pin, { pin = it.filter(Char::isDigit).take(8) }, label = { Text("Secure PIN") }, leadingIcon = { Icon(Icons.Outlined.Lock, null) },
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    value = pin,
+                    onValueChange = { pin = it.filter(Char::isDigit).take(8) },
+                    label = { Text("Access PIN") },
+                    leadingIcon = { Icon(Icons.Outlined.Lock, null, tint = WhatsAppVibrantGreen) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    singleLine = true,
+                    shape = WhatsAppShapes.card,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WhatsAppVibrantGreen,
+                        focusedLabelColor = WhatsAppVibrantGreen,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(rememberAmbulance, { rememberAmbulance = it })
-                    Text("Remember authorized ambulance", Modifier.clickable { rememberAmbulance = !rememberAmbulance }.padding(vertical = 12.dp))
+                    Checkbox(
+                        checked = rememberAmbulance,
+                        onCheckedChange = { rememberAmbulance = it },
+                        colors = CheckboxDefaults.colors(checkedColor = WhatsAppVibrantGreen),
+                    )
+                    Text(
+                        "Remember authorized vehicle on this device",
+                        Modifier.clickable { rememberAmbulance = !rememberAmbulance }.padding(vertical = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
                 ConnectionBadge("Broker", "Configured ${BuildConfig.MQTT_HOST}:${BuildConfig.MQTT_PORT}")
-                PrimaryActionButton("Sign in", { vm.login(driverId, pin, rememberAmbulance) })
-                Text("Prototype local authorization. The PIN is validated on-device and is never stored.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PrimaryActionButton("Sign In", { vm.login(driverId, pin, rememberAmbulance) })
+                Text(
+                    "Local authorization. Driver credentials are authenticated on-device.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -254,29 +330,71 @@ private fun LoginScreen(state: TripUiState, vm: TripViewModel) {
 private data class AmbulanceChoice(val id: String, val registration: String, val unit: String)
 
 @Composable
-private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel) {
+private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     val choices = listOf(
-        AmbulanceChoice("AMB-001", "Not configured", "Prototype fleet"), AmbulanceChoice("AMB-002", "Not configured", "Prototype fleet"),
-        AmbulanceChoice("AMB-003", "Not configured", "Prototype fleet"), AmbulanceChoice("AMB-004", "Not configured", "Prototype fleet"),
+        AmbulanceChoice("AMB-001", "MH-12-RN-1001", "City General Emergency Unit 1"),
+        AmbulanceChoice("AMB-002", "MH-12-RN-1002", "Metro Trauma Care Unit 2"),
+        AmbulanceChoice("AMB-003", "MH-12-RN-1003", "St. Jude Rapid Response"),
+        AmbulanceChoice("AMB-004", "MH-12-RN-1004", "Pediatric Critical Care"),
     )
     ScreenContainer {
-        ScreenHeading("Select ambulance", "Only vehicles authorized by the junction configuration are listed.")
+        ScreenHeading("Select Ambulance", "Choose an authorized vehicle from your connected fleet.")
         MessageBanner(state.message)
+        WhatsAppSecurityBanner(
+            "Fleet authentication active. Selected vehicle receives encrypted traffic-light preemption authorization.",
+            darkTheme = darkTheme,
+        )
+        Text("Active Vehicles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         choices.forEach { item ->
+            val isSelected = item.id == state.ambulanceId
+            val cardBg = if (isSelected) WhatsAppTokens.outgoingBubbleColor(darkTheme) else MaterialTheme.colorScheme.surface
+            val borderStroke = if (isSelected) BorderStroke(2.dp, WhatsAppVibrantGreen) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+
             Card(
-                Modifier.fillMaxWidth().clickable { vm.selectAmbulance(item.id) },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(if (item.id == state.ambulanceId) 2.dp else 1.dp, if (item.id == state.ambulanceId) PrimaryTeal else MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth().clickable { vm.selectAmbulance(item.id) },
+                shape = WhatsAppShapes.card,
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = borderStroke,
             ) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Icon(Icons.Outlined.DirectionsCar, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(30.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(item.id, style = MaterialTheme.typography.titleMedium)
-                        Text("Registration · ${item.registration}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Service unit · ${item.unit}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Last connection · Not available", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(WhatsAppVibrantGreen.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.DirectionsCar,
+                            contentDescription = null,
+                            tint = WhatsAppVibrantGreen,
+                            modifier = Modifier.size(26.dp),
+                        )
                     }
-                    ConnectionBadge("Status", "Authorized")
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(item.id, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            WhatsAppCheckMarks(CheckMarkState.DOUBLE_BLUE)
+                        }
+                        Text(item.unit, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Reg: ${item.registration}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Surface(
+                        shape = WhatsAppShapes.pillBadge,
+                        color = WhatsAppVibrantGreen.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            "Authorized",
+                            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = WhatsAppVibrantGreen,
+                        )
+                    }
                 }
             }
         }
@@ -284,129 +402,258 @@ private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel) {
 }
 
 @Composable
-private fun PriorityScreen(state: TripUiState, vm: TripViewModel) {
+private fun PriorityScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     ScreenContainer {
-        SetupProgress(1, "Patient details")
-        ScreenHeading("Medical priority", "Select the reported urgency. Critical is never preselected.")
+        SetupProgress(1, "Medical Urgency")
+        ScreenHeading("Reported Urgency", "Select patient severity to determine priority queue position.")
         MessageBanner(state.message)
-        PatientPriority.entries.forEach { priority -> PriorityCard(priority, state.priority == priority, { vm.setPriority(priority) }) }
-        PrimaryActionButton("Continue to condition", vm::continueFromPriority, enabled = state.priority != null)
-        OutlinedButton({ vm.backTo(AppScreen.AMBULANCE) }, Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null); Text("Choose another ambulance", Modifier.padding(start = 8.dp)) }
+        PatientPriority.entries.forEach { priority ->
+            PriorityCard(
+                priority = priority,
+                selected = state.priority == priority,
+                onSelect = { vm.setPriority(priority) },
+                darkTheme = darkTheme,
+            )
+        }
+        PrimaryActionButton("Continue to Condition", vm::continueFromPriority, enabled = state.priority != null)
+        OutlinedButton(
+            onClick = { vm.backTo(AppScreen.AMBULANCE) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = WhatsAppShapes.actionButton,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface)
+            Text("Choose another ambulance", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
 @Composable
-private fun ConditionScreen(state: TripUiState, vm: TripViewModel) {
+private fun ConditionScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     ScreenContainer {
-        SetupProgress(1, "Patient details")
-        ScreenHeading("Reported condition", "Record only the minimum operational category—never the patient’s name.")
+        SetupProgress(1, "Medical Condition")
+        ScreenHeading("Patient Condition", "Record the minimum clinical category for the emergency signal log.")
         MessageBanner(state.message)
-        PatientCondition.entries.forEach { condition -> ConditionChip(condition.label, state.condition == condition, { vm.setCondition(condition) }) }
-        PrimaryActionButton("Continue to destination", vm::continueFromCondition, enabled = state.condition != null)
-        OutlinedButton({ vm.backTo(AppScreen.PRIORITY) }, Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null); Text("Back to priority", Modifier.padding(start = 8.dp)) }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PatientCondition.entries.forEach { condition ->
+                ConditionChip(
+                    label = condition.label,
+                    selected = state.condition == condition,
+                    onSelect = { vm.setCondition(condition) },
+                    darkTheme = darkTheme,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        PrimaryActionButton("Continue to Destination", vm::continueFromCondition, enabled = state.condition != null)
+        OutlinedButton(
+            onClick = { vm.backTo(AppScreen.PRIORITY) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = WhatsAppShapes.actionButton,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface)
+            Text("Back to urgency selection", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
 @Composable
-private fun DestinationScreen(state: TripUiState, vm: TripViewModel) {
+private fun DestinationScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     ScreenContainer {
         SetupProgress(2, "Destination")
-        ScreenHeading("Destination hospital", "Enter the receiving hospital. External map services are not required.")
+        ScreenHeading("Destination Hospital", "Enter the receiving medical center.")
         MessageBanner(state.message)
         OutlinedTextField(
-            state.destination, vm::setDestination, label = { Text("Hospital name") }, leadingIcon = { Icon(Icons.Outlined.LocalHospital, null) },
-            supportingText = { Text("Route distance becomes available after GPS starts.") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            value = state.destination,
+            onValueChange = vm::setDestination,
+            label = { Text("Hospital name") },
+            leadingIcon = { Icon(Icons.Outlined.LocalHospital, null, tint = WhatsAppVibrantGreen) },
+            supportingText = { Text("Junction distance & approach calculation start upon departure.") },
+            singleLine = true,
+            shape = WhatsAppShapes.card,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = WhatsAppVibrantGreen,
+                focusedLabelColor = WhatsAppVibrantGreen,
+            ),
+            modifier = Modifier.fillMaxWidth(),
         )
-        Text("Recently used hospitals", style = MaterialTheme.typography.titleMedium)
-        if (state.recentHospitals.isEmpty()) EmptyState("No recent hospitals", "Hospitals confirmed on this device will appear here.")
-        else state.recentHospitals.forEach { hospital ->
-            OutlinedButton({ vm.useRecentHospital(hospital) }, Modifier.fillMaxWidth().height(50.dp)) { Text(hospital) }
+        Text("Saved & Recent Locations", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (state.recentHospitals.isEmpty()) {
+            EmptyState("No recent destinations", "Frequently confirmed hospitals will appear here.")
+        } else {
+            state.recentHospitals.forEach { hospital ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { vm.useRecentHospital(hospital) },
+                    shape = WhatsAppShapes.card,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            Modifier.size(38.dp).clip(CircleShape).background(WhatsAppVibrantGreen.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Outlined.Place, contentDescription = null, tint = WhatsAppVibrantGreen, modifier = Modifier.size(20.dp))
+                        }
+                        Text(hospital, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Icon(Icons.Outlined.NearMe, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
         }
-        PrimaryActionButton("Review emergency route", vm::reviewTrip, enabled = state.destination.isNotBlank())
-        OutlinedButton({ vm.backTo(AppScreen.CONDITION) }, Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null); Text("Back to patient details", Modifier.padding(start = 8.dp)) }
+        PrimaryActionButton("Review Route", vm::reviewTrip, enabled = state.destination.isNotBlank())
+        OutlinedButton(
+            onClick = { vm.backTo(AppScreen.CONDITION) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = WhatsAppShapes.actionButton,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface)
+            Text("Back to patient condition", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
 @Composable
-private fun TripConfirmationScreen(state: TripUiState, vm: TripViewModel, start: () -> Unit) {
+private fun TripConfirmationScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean, start: () -> Unit) {
     ScreenContainer {
         SetupProgress(3, "Confirmation")
-        ScreenHeading("Confirm emergency route", "Review every detail before starting continuous GPS transmission.")
+        ScreenHeading("Confirm Emergency Route", "Verify preemption parameters before activating live telemetry.")
         MessageBanner(state.message)
-        DetailCard("Route summary", listOf(
-            "Ambulance" to state.ambulanceId,
-            "Medical priority" to priorityLabel(state.priority),
-            "Condition" to (state.condition?.label ?: "Not selected"),
-            "Destination" to state.destination,
-            "GPS" to "Permission checked on start",
-            "MQTT" to "Connects on start",
-        ))
-        WarningBanner("Driver confirmation required", "Starting this route enables a foreground GPS service and transmits operational data every 1–2 seconds.")
+        DetailCard(
+            "Route Overview",
+            listOf(
+                "Ambulance" to state.ambulanceId,
+                "Medical urgency" to priorityLabel(state.priority),
+                "Condition" to (state.condition?.label ?: "Not selected"),
+                "Destination" to state.destination,
+                "GPS Service" to "Verified on start",
+                "MQTT Preemption" to "Auto-connect",
+            ),
+        )
+        WhatsAppSecurityBanner(
+            "Driver confirmation required: Starting this route engages high-precision GPS telemetry and broadcasts authenticated signal preemption requests.",
+            darkTheme = darkTheme,
+        )
         PrimaryActionButton("START EMERGENCY ROUTE", start)
-        OutlinedButton({ vm.backTo(AppScreen.DESTINATION) }, Modifier.fillMaxWidth().height(50.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null); Text("Edit destination", Modifier.padding(start = 8.dp)) }
+        OutlinedButton(
+            onClick = { vm.backTo(AppScreen.DESTINATION) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = WhatsAppShapes.actionButton,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface)
+            Text("Edit destination", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
 @Composable
-private fun ActiveEmergencyScreen(state: TripUiState, vm: TripViewModel) {
+private fun ActiveEmergencyScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     val elapsed by produceState(initialValue = 0L, state.startTime) {
-        while (true) { value = state.startTime?.let { Duration.between(it, Instant.now()).seconds.coerceAtLeast(0) } ?: 0; delay(1000) }
+        while (true) {
+            value = state.startTime?.let { Duration.between(it, Instant.now()).seconds.coerceAtLeast(0) } ?: 0
+            delay(1000)
+        }
     }
     val stage = emergencyStage(state)
-    val statusMessage = if (stage < 0) "Waiting for precise GPS" else listOf(
-        "GPS transmission active", "Approaching ${state.detectedApproach.lowercase().replaceFirstChar(Char::uppercase)} side", "Priority request submitted",
-        "Request validated — wait for signal confirmation", "${state.detectedApproach.lowercase().replaceFirstChar(Char::uppercase)} approach priority granted", "Junction cleared",
-    ).getOrElse(stage) { "Junction status updating" }
+    val statusMessage = if (stage < 0) "Acquiring precision GPS fix" else listOf(
+        "GPS transmission active",
+        "Approaching ${state.detectedApproach.lowercase().replaceFirstChar(Char::uppercase)} approach",
+        "Preemption request transmitted",
+        "Request validated · Awaiting green light",
+        "${state.detectedApproach.lowercase().replaceFirstChar(Char::uppercase)} green priority confirmed",
+        "Junction cleared safely",
+    ).getOrElse(stage) { "Junction state updating" }
+
     ScreenContainer {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("Emergency Active", style = MaterialTheme.typography.displaySmall)
-                Text(statusMessage, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Emergency Active", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    WhatsAppCheckMarks(if (stage >= 4) CheckMarkState.DOUBLE_BLUE else CheckMarkState.DOUBLE_GREY)
+                }
+                Text(statusMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Surface(shape = MaterialTheme.shapes.small, color = priorityColour(state.priority).copy(alpha = .14f), border = BorderStroke(1.dp, priorityColour(state.priority))) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Icon(Icons.Outlined.LocalHospital, null, tint = priorityColour(state.priority), modifier = Modifier.size(19.dp))
-                    Text(priorityLabel(state.priority), fontWeight = FontWeight.SemiBold, color = priorityColour(state.priority))
+            Surface(
+                shape = WhatsAppShapes.pillBadge,
+                color = priorityColour(state.priority).copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, priorityColour(state.priority)),
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.LocalHospital, null, tint = priorityColour(state.priority), modifier = Modifier.size(17.dp))
+                    Text(priorityLabel(state.priority), fontWeight = FontWeight.Bold, color = priorityColour(state.priority), style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
+
+        LiveLocationRadarBanner("Broadcasting real-time telemetry to junction controller")
+
         val mqttLost = state.mqttStatus.contains("error", true) || state.mqttStatus.contains("disconnected", true) || state.mqttStatus.contains("reconnecting", true)
         val gpsLost = listOf("denied", "unavailable", "inaccurate", "lost").any { state.gpsStatus.contains(it, true) }
-        if (mqttLost || gpsLost) WarningBanner(
-            if (mqttLost) "MQTT connection interrupted" else "GPS requires attention",
-            if (mqttLost) "Last known signal status is retained. No priority confirmation will be inferred while offline." else "${state.gpsStatus}. Move to an open area and confirm precise-location permission.",
-            onRetry = vm::retryConnections,
-        )
-        if (state.gpsStatus.contains("acquiring", true)) LoadingState("Acquiring a precise GPS fix. MQTT remains connected independently.")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LiveMetricCard("Distance to junction", state.distanceMetres?.let { "%.0f m".format(it) } ?: "—", Modifier.weight(1f), state.nextJunction)
-            LiveMetricCard("Estimated arrival", state.distanceMetres?.let { distance -> if (state.speedMps > 0.5f) "%.0f s".format(distance / state.speedMps) else "—" } ?: "—", Modifier.weight(1f), "Live estimate")
-            LiveMetricCard("Trip elapsed", "%02d:%02d".format(elapsed / 60, elapsed % 60), Modifier.weight(1f), "mm:ss")
+        if (mqttLost || gpsLost) {
+            WarningBanner(
+                title = if (mqttLost) "MQTT Link Interrupted" else "GPS Requires Calibration",
+                detail = if (mqttLost) "Retaining last known state. No preemption is assumed while offline." else "${state.gpsStatus}. Move to open sky.",
+                onRetry = vm::retryConnections,
+            )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.gpsStatus.contains("acquiring", true)) {
+            LoadingState("Acquiring GPS fix. MQTT session remains online.")
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LiveMetricCard("Distance", state.distanceMetres?.let { "%.0f m".format(it) } ?: "—", Modifier.weight(1f), state.nextJunction, isHighlight = true, darkTheme = darkTheme)
+            LiveMetricCard("ETA", state.distanceMetres?.let { distance -> if (state.speedMps > 0.5f) "%.0f s".format(distance / state.speedMps) else "—" } ?: "—", Modifier.weight(1f), "Live estimate", darkTheme = darkTheme)
+            LiveMetricCard("Duration", "%02d:%02d".format(elapsed / 60, elapsed % 60), Modifier.weight(1f), "In transit", darkTheme = darkTheme)
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ConnectionBadge("GPS", state.gpsStatus, Modifier.weight(1f))
             ConnectionBadge("MQTT", state.mqttStatus, Modifier.weight(1f))
         }
+
         BoxWithConstraints {
             if (maxWidth > 680.dp) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
                     EmergencyStatusCard(EMERGENCY_STAGES, stage, Modifier.weight(1f))
-                    DetailCard("Live route status", activeDetails(state), Modifier.weight(1f))
+                    DetailCard("Live Telemetry", activeDetails(state), Modifier.weight(1f))
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     EmergencyStatusCard(EMERGENCY_STAGES, stage)
-                    DetailCard("Live route status", activeDetails(state))
+                    DetailCard("Live Telemetry", activeDetails(state))
                 }
             }
         }
-        PrimaryActionButton("View live GPS and connection", vm::showLiveGps)
-        OutlinedButton(vm::requestDelivery, Modifier.fillMaxWidth().height(52.dp)) { Icon(Icons.Outlined.CheckCircle, null); Text("Complete Trip", Modifier.padding(start = 8.dp)) }
-        DangerActionButton("Cancel Emergency", vm::requestCancel)
+
+        PrimaryActionButton("View Live Telemetry Map", vm::showLiveGps)
+        OutlinedButton(
+            onClick = vm::requestDelivery,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = WhatsAppShapes.actionButton,
+            border = BorderStroke(1.dp, WhatsAppVibrantGreen),
+        ) {
+            Icon(Icons.Outlined.CheckCircle, null, tint = WhatsAppVibrantGreen)
+            Text("Complete Trip (Patient Delivered)", Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold, color = WhatsAppVibrantGreen)
+        }
+        DangerActionButton("Cancel Emergency Preemption", vm::requestCancel)
     }
 }
 
-private val EMERGENCY_STAGES = listOf("GPS ACTIVE", "JUNCTION DETECTED", "REQUEST SENT", "REQUEST VALIDATED", "PRIORITY GRANTED", "JUNCTION CLEARED")
+private val EMERGENCY_STAGES = listOf(
+    "GPS ACTIVE",
+    "JUNCTION DETECTED",
+    "REQUEST SENT",
+    "REQUEST VALIDATED",
+    "PRIORITY GRANTED",
+    "JUNCTION CLEARED",
+)
 
 private fun emergencyStage(state: TripUiState): Int {
     var stage = -1
@@ -425,9 +672,9 @@ private fun activeDetails(state: TripUiState) = listOf(
     "Detected approach" to state.detectedApproach,
     "Request status" to state.requestStatus,
     "Signal priority" to when {
-        !state.mqttStatus.equals("Connected", true) -> "Confirmation unavailable offline"
-        emergencyStage(state) >= 4 -> "Confirmed by junction"
-        else -> "Not yet confirmed"
+        !state.mqttStatus.equals("Connected", true) -> "Offline"
+        emergencyStage(state) >= 4 -> "Confirmed Green ✓✓"
+        else -> "Pending validation"
     },
     "Current speed" to "%.1f m/s".format(state.speedMps),
     "GPS accuracy" to (state.accuracyMetres?.let { "%.1f m".format(it) } ?: "—"),
@@ -435,38 +682,52 @@ private fun activeDetails(state: TripUiState) = listOf(
 )
 
 @Composable
-private fun LiveGpsScreen(state: TripUiState, vm: TripViewModel) {
+private fun LiveGpsScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
     ScreenContainer {
-        ScreenHeading("Live GPS & connection", "Operational values for the active emergency trip.")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        ScreenHeading("Live Telemetry Feed", "Encrypted GPS and MQTT metrics stream.")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ConnectionBadge("GPS", state.gpsStatus, Modifier.weight(1f))
             ConnectionBadge("MQTT", state.mqttStatus, Modifier.weight(1f))
         }
-        if (!state.gpsStatus.equals("Live", true)) WarningBanner("Waiting for reliable positioning", "${state.gpsStatus}. The last known values remain visible and no false priority status is shown.", onRetry = vm::retryConnections)
-        DetailCard("GPS telemetry", listOf(
-            "Trip ID" to state.tripId,
-            "Latitude" to (state.latitude?.let { "%.6f".format(it) } ?: "—"),
-            "Longitude" to (state.longitude?.let { "%.6f".format(it) } ?: "—"),
-            "Accuracy" to (state.accuracyMetres?.let { "%.1f m".format(it) } ?: "—"),
-            "Speed" to "%.1f m/s".format(state.speedMps),
-            "Heading" to "%.0f°".format(state.headingDegrees),
-            "Broker" to "${BuildConfig.MQTT_HOST}:${BuildConfig.MQTT_PORT}",
-        ))
-        PrimaryActionButton("Back to emergency route", vm::showEmergency)
+        if (!state.gpsStatus.equals("Live", true)) {
+            WarningBanner(
+                title = "Waiting for reliable positioning",
+                detail = "${state.gpsStatus}. The last verified coordinates remain available.",
+                onRetry = vm::retryConnections,
+            )
+        }
+        DetailCard(
+            "GPS Telemetry Details",
+            listOf(
+                "Trip ID" to state.tripId,
+                "Latitude" to (state.latitude?.let { "%.6f".format(it) } ?: "—"),
+                "Longitude" to (state.longitude?.let { "%.6f".format(it) } ?: "—"),
+                "Accuracy" to (state.accuracyMetres?.let { "%.1f m".format(it) } ?: "—"),
+                "Speed" to "%.1f m/s".format(state.speedMps),
+                "Heading" to "%.0f°".format(state.headingDegrees),
+                "MQTT Broker" to "${BuildConfig.MQTT_HOST}:${BuildConfig.MQTT_PORT}",
+            ),
+        )
+        PrimaryActionButton("Back to Emergency Session", vm::showEmergency)
     }
 }
 
 @Composable
 private fun DetailCard(title: String, rows: List<Pair<String, String>>, modifier: Modifier = Modifier) {
-    Card(modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = WhatsAppShapes.card,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+    ) {
         Column(Modifier.fillMaxWidth().padding(LifeLaneDimens.cardPadding), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             rows.forEachIndexed { index, (label, value) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1.25f))
+                    Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1.3f))
                 }
-                if (index < rows.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .5f))
+                if (index < rows.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
             }
         }
     }
