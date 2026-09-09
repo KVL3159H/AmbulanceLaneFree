@@ -8,7 +8,7 @@ echo ========================================================
 
 REM Check if virtual environment exists
 if exist ".venv\Scripts\python.exe" (
-    echo Using virtual environment at .venv...
+    echo [INFO] Using virtual environment (.venv)...
     ".venv\Scripts\python.exe" -m windows_app.main %*
     goto :end
 )
@@ -16,13 +16,15 @@ if exist ".venv\Scripts\python.exe" (
 REM Fallback to system python
 where python >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-    echo Using system Python...
+    echo [INFO] Using system Python...
     python -m windows_app.main %*
     goto :end
 )
 
-echo [ERROR] Python was not found on your PATH and .venv was not found.
+echo.
+echo [ERROR] Python was not found in your PATH and .venv was not found.
 echo Please run scripts\install_windows.bat first or install Python 3.10+.
+echo.
 pause
 
 :end

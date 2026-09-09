@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-APP_USER_MODEL_ID = "LifeLane.Simulator.TrafficPreemption.1.0"
+APP_USER_MODEL_ID = "LifeLane.Simulator.TrafficPreemption.1.2"
 
 
 def get_base_directories() -> tuple[Path, Path]:

@@ -20,10 +20,14 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(TripUiState(ambulanceId = rememberedAmbulance, recentHospitals = recentHospitals))
     val state = _state.asStateFlow()
 
+    /** Set to true after we fetch hospitals for the current GPS fix (avoid re-fetching). */
+    private var hospitalsFetched = false
+
     init {
         viewModelScope.launch {
             TripStatusRepository.serviceState.collectLatest { service ->
                 if (_state.value.emergencyActive) {
+                    val newSignalStatus = service.signalStatus
                     _state.value = _state.value.copy(
                         latitude = service.latitude,
                         longitude = service.longitude,
@@ -35,7 +39,8 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
                         distanceMetres = service.distanceMetres,
                         detectedApproach = service.detectedApproach,
                         requestStatus = service.requestStatus,
-                        signalStatus = service.signalStatus,
+                        signalStatus = newSignalStatus,
+                        signalArms = SignalArms.fromString(newSignalStatus),
                     )
                 }
             }
@@ -61,7 +66,17 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     fun selectAmbulance(id: String) {
         if (_state.value.rememberAmbulance) preferences.edit { putString("ambulance_id", id) }
         else preferences.edit { remove("ambulance_id") }
-        _state.value = _state.value.copy(ambulanceId = id, screen = AppScreen.PRIORITY, priority = null, condition = null, destination = "", message = null)
+        _state.value = _state.value.copy(
+            ambulanceId = id,
+            screen = AppScreen.PRIORITY,
+            priority = null,
+            condition = null,
+            destination = "",
+            selectedHospital = null,
+            destinationLat = null,
+            destinationLon = null,
+            message = null,
+        )
     }
 
     fun setPriority(value: PatientPriority) { _state.value = _state.value.copy(priority = value, message = null) }
@@ -73,16 +88,98 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     fun setCondition(value: PatientCondition) { _state.value = _state.value.copy(condition = value, message = null) }
     fun continueFromCondition() {
         _state.value = if (_state.value.condition == null) _state.value.copy(message = "Select the reported patient condition.")
-        else _state.value.copy(screen = AppScreen.DESTINATION, message = null)
+        else {
+            // Start fetching nearby hospitals when moving to DESTINATION screen if we have GPS
+            val s = _state.value
+            if (!hospitalsFetched && s.latitude != null && s.longitude != null) {
+                fetchNearbyHospitals(s.latitude, s.longitude)
+            }
+            s.copy(screen = AppScreen.DESTINATION, message = null)
+        }
     }
 
-    fun setDestination(value: String) { _state.value = _state.value.copy(destination = value, message = null) }
+    /**
+     * Called by the GPS update observer (from outside) when the device gets a first fix.
+     * Triggers a one-time Overpass fetch for nearby hospitals.
+     */
+    fun onFirstGpsFix(lat: Double, lon: Double) {
+        if (hospitalsFetched) return
+        fetchNearbyHospitals(lat, lon)
+    }
+
+    private fun fetchNearbyHospitals(lat: Double, lon: Double) {
+        if (hospitalsFetched) return
+        hospitalsFetched = true
+        _state.value = _state.value.copy(hospitalsLoading = true, hospitalsError = null)
+        viewModelScope.launch {
+            try {
+                val hospitals = HospitalRepository.fetchNearby(lat, lon)
+                _state.value = _state.value.copy(
+                    nearbyHospitals = hospitals,
+                    hospitalsLoading = false,
+                    hospitalsError = if (hospitals == HospitalRepository.RAJAPALAYAM_FALLBACK)
+                        "Showing offline hospitals — check internet for live results." else null,
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    hospitalsLoading = false,
+                    hospitalsError = "Could not fetch nearby hospitals.",
+                )
+            }
+        }
+    }
+
+    fun selectHospital(hospital: HospitalDestination) {
+        _state.value = _state.value.copy(
+            destination = hospital.name,
+            selectedHospital = hospital,
+            destinationLat = hospital.latitude,
+            destinationLon = hospital.longitude,
+            message = null,
+        )
+    }
+
+    fun setDestination(value: String) {
+        val matched = _state.value.nearbyHospitals.find { it.name.equals(value.trim(), ignoreCase = true) }
+        _state.value = _state.value.copy(
+            destination = value,
+            selectedHospital = matched,
+            destinationLat = matched?.latitude,
+            destinationLon = matched?.longitude,
+            message = null,
+        )
+    }
+
+    fun useRecentHospital(value: String) {
+        val matched = _state.value.nearbyHospitals.find { it.name.equals(value.trim(), ignoreCase = true) }
+        _state.value = _state.value.copy(
+            destination = value,
+            selectedHospital = matched,
+            destinationLat = matched?.latitude,
+            destinationLon = matched?.longitude,
+            message = null,
+        )
+    }
+
     fun reviewTrip() {
-        _state.value = if (_state.value.destination.isBlank()) _state.value.copy(message = "Enter a destination hospital.")
-        else _state.value.copy(destination = _state.value.destination.trim(), screen = AppScreen.CONFIRM, message = null)
+        val dest = _state.value.destination.trim()
+        if (dest.isBlank()) {
+            _state.value = _state.value.copy(message = "Select or enter a destination hospital.")
+            return
+        }
+        val matched = _state.value.selectedHospital
+            ?: _state.value.nearbyHospitals.find { it.name.contains(dest, ignoreCase = true) }
+            ?: _state.value.nearbyHospitals.firstOrNull()
+            ?: HospitalRepository.RAJAPALAYAM_FALLBACK.first()
+        _state.value = _state.value.copy(
+            destination = dest,
+            selectedHospital = matched,
+            destinationLat = matched.latitude,
+            destinationLon = matched.longitude,
+            screen = AppScreen.CONFIRM,
+            message = null,
+        )
     }
-
-    fun useRecentHospital(value: String) { _state.value = _state.value.copy(destination = value, message = null) }
 
     fun startTrip() {
         val current = _state.value
@@ -92,15 +189,24 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         val tripId = "TRIP-${UUID.randomUUID().toString().take(8).uppercase()}"
         val hospitals = (current.recentHospitals + current.destination).distinct().takeLast(5)
         preferences.edit { putStringSet("recent_hospitals", hospitals.toSet()) }
+
+        val hospital = current.selectedHospital
+            ?: current.nearbyHospitals.firstOrNull()
+            ?: HospitalRepository.RAJAPALAYAM_FALLBACK.first()
+
         val started = current.copy(
             tripId = tripId,
             emergencyActive = true,
+            selectedHospital = hospital,
+            destinationLat = hospital.latitude,
+            destinationLon = hospital.longitude,
             startTime = Instant.now(),
             screen = AppScreen.EMERGENCY,
             gpsStatus = "Acquiring GPS",
             mqttStatus = "Connecting",
             requestStatus = "Not requested",
             signalStatus = "Awaiting junction status",
+            signalArms = SignalArms(),
             recentHospitals = hospitals,
         )
         _state.value = started
@@ -112,6 +218,8 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
             putExtra(EmergencyLocationService.EXTRA_PRIORITY, priority.name)
             putExtra(EmergencyLocationService.EXTRA_CONDITION, condition.name)
             putExtra(EmergencyLocationService.EXTRA_DESTINATION, started.destination)
+            putExtra(EmergencyLocationService.EXTRA_DEST_LAT, hospital.latitude)
+            putExtra(EmergencyLocationService.EXTRA_DEST_LON, hospital.longitude)
         }
         ContextCompat.startForegroundService(getApplication(), intent)
     }
@@ -143,6 +251,7 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
             ambulanceId = _state.value.ambulanceId,
             rememberAmbulance = _state.value.rememberAmbulance,
             recentHospitals = _state.value.recentHospitals,
+            nearbyHospitals = _state.value.nearbyHospitals,
             message = if (cancelled) "Emergency cancelled and transmissions stopped." else "Trip completed and transmissions stopped.",
         )
     }

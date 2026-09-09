@@ -168,7 +168,7 @@ class MainWindow(QMainWindow):
         simulation = QLabel("SOFTWARE SIMULATION")
         simulation.setObjectName("SimulationMark"); simulation.setAlignment(Qt.AlignmentFlag.AlignCenter); simulation.setToolTip("Demonstration only. No GPIO or physical traffic-light control.")
         layout.addWidget(simulation)
-        version = QLabel("LifeLane prototype · v1.0"); version.setObjectName("Muted"); version.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(version)
+        version = QLabel("LifeLane prototype · v1.2"); version.setObjectName("Muted"); version.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(version)
         return rail
 
     def _top_bar(self) -> QWidget:
