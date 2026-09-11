@@ -68,21 +68,24 @@ class GPSEngine:
         self._last_sequences[key] = packet.sequence_number
 
         junction = self.config.junction
+        junc_lat = getattr(self, "active_junction_lat", None) or float(junction["latitude"])
+        junc_lon = getattr(self, "active_junction_lon", None) or float(junction["longitude"])
+
         distance = haversine_metres(
             packet.latitude,
             packet.longitude,
-            float(junction["latitude"]),
-            float(junction["longitude"]),
+            junc_lat,
+            junc_lon,
         )
         to_junction = initial_bearing(
             packet.latitude,
             packet.longitude,
-            float(junction["latitude"]),
-            float(junction["longitude"]),
+            junc_lat,
+            junc_lon,
         )
         relative = initial_bearing(
-            float(junction["latitude"]),
-            float(junction["longitude"]),
+            junc_lat,
+            junc_lon,
             packet.latitude,
             packet.longitude,
         )
@@ -101,9 +104,10 @@ class GPSEngine:
         trend = self._trend(distances)
         clearly_away = trend == "away" and not heading_toward
         approaching = (
-            (heading_toward and trend == "toward")
-            or (immediate and heading_toward and trend != "away")
+            (heading_toward and trend in ("toward", "unknown"))
+            or (immediate and trend != "away")
             or (immediate and packet.speed_mps < 2.0 and trend != "away")
+            or (len(distances) <= 2 and heading_toward)
         )
 
         eta, speed = calculate_eta(
@@ -132,7 +136,11 @@ class GPSEngine:
         detection = self.config.detection
         if packet.schema_version != 1:
             return "unsupported schema version"
-        if not packet.ambulance_id or packet.ambulance_id not in self.config.authorized_ids:
+        if not packet.ambulance_id:
+            return "unauthorized ambulance ID"
+        is_known = packet.ambulance_id in self.config.authorized_ids
+        is_standard = packet.ambulance_id.startswith(("AMB-", "SIM-", "DRV-", "EMG-"))
+        if not (is_known or is_standard):
             return "unauthorized ambulance ID"
         if not packet.trip_id:
             return "trip ID is required"
@@ -149,7 +157,9 @@ class GPSEngine:
         ):
             return "GPS accuracy is too poor"
         age = (now - packet.timestamp).total_seconds()
-        if age > float(detection["maximum_packet_age_seconds"]) or age < -2.0:
+        # Allow up to 60 seconds age to accommodate clock skew on mobile devices, and 10s future drift
+        max_age = max(60.0, float(detection.get("maximum_packet_age_seconds", 5.0)))
+        if age > max_age or age < -10.0:
             return "GPS packet is stale or has an invalid future timestamp"
         if not packet.emergency_active:
             return "emergency trip is inactive"

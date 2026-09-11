@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeLane · Junction Command Centre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --bg:       #05080f;
+  --bg1:      #080d18;
+  --bg2:      #0b1020;
+  --sur:      #0f1526;
+  --sur2:     #141c30;
+  --sur3:     #1a2338;
+  --b0:       rgba(255,255,255,.04);
+  --b1:       rgba(255,255,255,.08);
+  --b2:       rgba(255,255,255,.14);
+
+  --teal:     #00e5c3;
+  --teal2:    #00b89c;
+  --teal3:    #007d6a;
+  --red:      #ff4560;
+  --red2:     #cc2240;
+  --amber:    #ffb020;
+  --amber2:   #c8820a;
+  --green:    #00e07a;
+  --green2:   #00a858;
+  --blue:     #4ea8ff;
+  --blue2:    #1e6ec8;
+  --violet:   #a78bff;
+  --white:    #e4eaf8;
+  --white2:   #9aaac8;
+  --muted:    #4a5870;
+
+  --r-xl: 16px;  --r-lg: 12px;  --r-md: 8px;  --r-sm: 6px;  --r-xs: 4px;
+  --f: 'Inter', system-ui, sans-serif;
+  --m: 'JetBrains Mono', monospace;
+
+  --sh-teal:  0 0 20px rgba(0,229,195,.25);
+  --sh-red:   0 0 20px rgba(255,69,96,.25);
+  --sh-amber: 0 0 20px rgba(255,176,32,.25);
+  --sh-green: 0 0 20px rgba(0,224,122,.25);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--f);
+  background: var(--bg);
+  color: var(--white);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: var(--b2) transparent; }
+
+/* ═══════════════════════════════════════════════════════════
+   APP SHELL
+   ═══════════════════════════════════════════════════════════ */
+#app { display: grid; grid-template-rows: 52px auto 1fr; height: 100vh; overflow: hidden; }
+
+/* ── TOPBAR ─────────────────────────────────────────────── */
+#topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: rgba(5,8,15,.92);
+  border-bottom: 1px solid var(--b1);
+  backdrop-filter: blur(24px);
+  z-index: 200;
+}
+.brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal3), var(--teal));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; color: #05080f;
+  box-shadow: var(--sh-teal);
+  flex-shrink: 0;
+}
+.brand-text { line-height: 1; }
+.brand-name { font-size: 14px; font-weight: 800; color: var(--teal); letter-spacing: -.3px; }
+.brand-sub  { font-size: 9px;  color: var(--muted); font-weight: 500; margin-top: 1px; }
+
+#tb-pipe {
+  display: flex; align-items: center; gap: 0;
+  background: var(--sur); border: 1px solid var(--b1);
+  border-radius: 30px; padding: 3px 8px; gap: 4px;
+  flex-shrink: 0;
+}
+.pipe-step {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 20px;
+  font-size: 9px; font-weight: 700; letter-spacing: .5px;
+  color: var(--muted); transition: all .3s ease;
+}
+.pipe-step.active { color: var(--teal); background: rgba(0,229,195,.1); }
+.pipe-step.done   { color: var(--green); }
+.pipe-step.warn   { color: var(--amber); background: rgba(255,176,32,.08); }
+.pipe-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.pipe-arrow { font-size: 8px; color: var(--muted); padding: 0 2px; }
+
+.tb-spacer { flex: 1; }
+
+#tb-mqtt-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px;
+  background: var(--sur); border: 1px solid var(--b1);
+  font-size: 9px; font-weight: 700;
+  transition: all .3s;
+}
+#tb-mqtt-badge.live   { border-color: rgba(0,224,122,.4); color: var(--green); }
+#tb-mqtt-badge.dead   { border-color: rgba(255,69,96,.4);  color: var(--red); }
+#tb-mqtt-badge.warn   { border-color: rgba(255,176,32,.4); color: var(--amber); animation: pulse-badge 1.4s ease-in-out infinite; }
+.mqtt-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.mqtt-dot.live  { box-shadow: 0 0 6px currentColor; animation: mqtt-live 2s ease-in-out infinite; }
+@keyframes mqtt-live  { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes pulse-badge{ 0%,100%{opacity:1} 50%{opacity:.6} }
+
+#preemption-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 9px; font-weight: 800; letter-spacing: .7px;
+  border: 1px solid; transition: all .3s ease; white-space: nowrap;
+}
+.phase-normal   { color:var(--teal);  border-color:rgba(0,229,195,.4);  background:rgba(0,229,195,.06); }
+.phase-preempt  { color:var(--amber); border-color:rgba(255,176,32,.5); background:rgba(255,176,32,.08); animation:badge-pulse 1s ease-in-out infinite; }
+.phase-green    { color:var(--green); border-color:rgba(0,224,122,.5);  background:rgba(0,224,122,.08); animation:badge-pulse .7s ease-in-out infinite; }
+.phase-recovery { color:var(--violet);border-color:rgba(167,139,255,.4);background:rgba(167,139,255,.07); }
+.phase-fail     { color:var(--red);   border-color:rgba(255,69,96,.5);  background:rgba(255,69,96,.1);  animation:badge-pulse .5s ease-in-out infinite; }
+@keyframes badge-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.tb-chip {
+  display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0;
+}
+.tb-chip-val   { font-size: 12px; font-weight: 700; font-family: var(--m); }
+.tb-chip-label { font-size: 8px;  color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+.tb-div { width:1px; height:22px; background:var(--b1); flex-shrink:0; }
+#tb-clock { font-family:var(--m); font-size:11px; color:var(--muted); min-width:62px; text-align:right; }
+
+/* ── WORKFLOW PIPELINE BAR ─────────────────────────────── */
+#workflow-bar {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; padding: 6px 16px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--b0);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.wf-stage {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 30px;
+  font-size: 9px; font-weight: 700; letter-spacing: .6px;
+  color: var(--muted); background: var(--sur); border: 1px solid var(--b0);
+  transition: all .4s ease; white-space: nowrap; position: relative;
+  flex-shrink: 0;
+}
+.wf-stage.active {
+  color: var(--teal); border-color: rgba(0,229,195,.4);
+  background: rgba(0,229,195,.07); box-shadow: var(--sh-teal);
+}
+.wf-stage.done   { color: var(--green); border-color: rgba(0,224,122,.3); background: rgba(0,224,122,.05); }
+.wf-stage.alert  { color: var(--amber); border-color: rgba(255,176,32,.4); background: rgba(255,176,32,.07); animation: badge-pulse 1.2s ease-in-out infinite; }
+.wf-stage.pass   { color: var(--violet); border-color: rgba(167,139,255,.3); background: rgba(167,139,255,.06); }
+.wf-icon { font-size: 11px; }
+.wf-arrow {
+  padding: 0 6px; color: var(--muted); font-size: 10px;
+  flex-shrink: 0;
+}
+.wf-arrow.lit { color: var(--teal); }
+
+/* ── MAIN LAYOUT ───────────────────────────────────────── */
+#main {
+  display: grid;
+  grid-template-columns: 280px 1fr 270px;
+  overflow: hidden;
+}
+
+/* ── PANELS ────────────────────────────────────────────── */
+.panel {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 9px;
+  background: var(--bg1);
+  overflow-y: auto;
+}
+#left-panel  { border-right: 1px solid var(--b0); }
+#right-panel { border-left:  1px solid var(--b0); }
+#center-panel {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--bg); gap: 6px; position: relative; overflow: hidden;
+}
+
+/* ── CARD ──────────────────────────────────────────────── */
+.card {
+  background: var(--sur);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-lg);
+  padding: 10px 11px;
+  flex-shrink: 0;
+}
+.card-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 5px;
+}
+.card-title .ct-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--teal); box-shadow: 0 0 5px var(--teal);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
+.card-badge {
+  font-size: 8px; font-weight: 700; padding: 2px 7px;
+  border-radius: 10px; background: var(--sur2); color: var(--muted);
+}
+.card-badge.live { background: rgba(0,224,122,.12); color: var(--green); }
+
+/* ── SIGNAL GRID ───────────────────────────────────────── */
+.signal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sig-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  background: var(--sur2); border: 1px solid var(--b0);
+  border-radius: var(--r-md); padding: 8px 6px;
+  transition: all .25s ease;
+}
+.sig-cell.green-active {
+  border-color: rgba(0,224,122,.4); background: rgba(0,224,122,.04);
+  box-shadow: 0 0 14px rgba(0,224,122,.1) inset;
+}
+.sig-cell.red-active   { border-color: rgba(255,69,96,.2); }
+.sig-label { font-size: 8px; font-weight: 700; color: var(--muted); letter-spacing: .6px; }
+.sig-head {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: #060810; border: 1.5px solid #1a1f30;
+  border-radius: 5px; padding: 5px 4px;
+}
+.sig-lamp {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #0d1020; border: 1px solid #1e2438;
+  transition: all .12s ease;
+}
+.sig-lamp.R.on { background:#ff2233; box-shadow:0 0 14px #ff223388,0 0 28px #ff223322; }
+.sig-lamp.A.on { background:#ffb020; box-shadow:0 0 14px #ffb02088,0 0 28px #ffb02022; }
+.sig-lamp.G.on { background:#00e676; box-shadow:0 0 14px #00e67688,0 0 28px #00e67622; }
+
+/* ── CONTROL BUTTONS ───────────────────────────────────── */
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.btn {
+  padding: 6px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--b2);
+  background: var(--sur2); color: var(--white2);
+  font-family: var(--f); font-size: 10px; font-weight: 700;
+  cursor: pointer; transition: all .18s ease; white-space: nowrap;
+  flex: 1;
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.25); }
+.btn:active { transform: none; filter: brightness(.9); }
+.btn.primary { background:var(--teal2); color:#05080f; border-color:var(--teal); box-shadow:var(--sh-teal); }
+.btn.danger  { background:rgba(255,69,96,.1); color:var(--red); border-color:rgba(255,69,96,.4); }
+.btn.warn    { background:rgba(255,176,32,.08); color:var(--amber); border-color:rgba(255,176,32,.35); }
+.btn:disabled{ opacity:.3; cursor:not-allowed; transform:none; }
+
+/* ── SPAWN GRID ────────────────────────────────────────── */
+.spawn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.spawn-btn {
+  padding: 7px 4px; border-radius: var(--r-sm);
+  border: 1px solid var(--b1); background: var(--sur2);
+  color: var(--white2); font-family: var(--f); font-size: 10px; font-weight: 700;
+  cursor: pointer; transition: all .18s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.spawn-btn .sa { font-size: 14px; line-height: 1; }
+.spawn-btn:hover { background: rgba(0,229,195,.1); border-color: var(--teal); color: var(--teal); transform: translateY(-1px); }
+.spawn-btn.N { border-top:    2px solid var(--teal2); }
+.spawn-btn.S { border-bottom: 2px solid var(--teal2); }
+.spawn-btn.E { border-right:  2px solid var(--teal2); }
+.spawn-btn.W { border-left:   2px solid var(--teal2); }
+
+/* ── PRIORITY PILLS ────────────────────────────────────── */
+.prio-row { display: flex; gap: 4px; }
+.prio-pill {
+  flex: 1; padding: 5px 3px; text-align: center;
+  border-radius: var(--r-xs); font-size: 9px; font-weight: 700;
+  cursor: pointer; border: 1px solid var(--b1);
+  background: transparent; color: var(--muted); transition: all .18s;
+}
+.prio-pill.RED.on    { background:#ff4560; color:#fff; border-color:#ff4560; box-shadow:0 0 10px rgba(255,69,96,.3); }
+.prio-pill.YELLOW.on { background:#ffb020; color:#111; border-color:#ffb020; box-shadow:0 0 10px rgba(255,176,32,.3); }
+.prio-pill.GREEN.on  { background:#00e07a; color:#0a1a0e; border-color:#00e07a; box-shadow:0 0 10px rgba(0,224,122,.3); }
+
+/* ── SPEED SLIDER ──────────────────────────────────────── */
+.speed-row { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+.speed-row label { font-size: 9px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.speed-row input { flex: 1; accent-color: var(--teal); cursor: pointer; }
+#speed-val { font-family: var(--m); font-size: 9px; color: var(--teal); min-width: 32px; font-weight: 700; }
+
+/* ── AMB LIST ──────────────────────────────────────────── */
+.amb-list { display: flex; flex-direction: column; gap: 4px; }
+.amb-row {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--sur2); border: 1px solid var(--b0);
+  border-radius: var(--r-sm); padding: 5px 8px;
+  transition: border-color .2s;
+}
+.amb-row.target-row { border-color: rgba(0,229,195,.35); background: rgba(0,229,195,.04); }
+.amb-siren {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  animation: siren .45s ease-in-out infinite alternate;
+}
+.amb-siren.RED    { background:var(--red);   box-shadow:0 0 6px var(--red);   }
+.amb-siren.YELLOW { background:var(--amber); box-shadow:0 0 5px var(--amber); }
+.amb-siren.GREEN  { background:var(--green); box-shadow:0 0 5px var(--green); }
+@keyframes siren { from{opacity:1} to{opacity:.25} }
+.amb-info { flex:1; min-width:0; }
+.amb-name { font-size: 9.5px; font-weight: 700; }
+.amb-meta { font-size: 8px; color: var(--muted); font-family: var(--m); margin-top: 1px; }
+.dir-badge {
+  padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 700;
+  background: rgba(0,229,195,.1); color: var(--teal);
+}
+
+/* ── METRIC GRID ───────────────────────────────────────── */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.metric-box {
+  background: var(--sur2); border: 1px solid var(--b0);
+  border-radius: var(--r-md); padding: 8px 9px;
+  transition: border-color .2s;
+}
+.metric-box.hl { border-color: rgba(0,229,195,.3); }
+.metric-lbl { font-size: 8px; color: var(--muted); font-weight: 600; letter-spacing: .4px; text-transform: uppercase; margin-bottom: 4px; }
+.metric-val { font-family: var(--m); font-size: 20px; font-weight: 700; color: var(--teal); line-height: 1; }
+.metric-val.amber { color: var(--amber); }
+.metric-val.red   { color: var(--red); }
+.metric-val.muted { color: var(--muted); font-size: 13px; }
+.metric-unit { font-size: 9px; color: var(--muted); margin-left: 1px; }
+
+/* ── PHASE BAR ─────────────────────────────────────────── */
+.phase-wrap { margin-top: 8px; }
+.phase-hd { display: flex; justify-content: space-between; font-size: 8px; color: var(--muted); margin-bottom: 3px; font-weight: 600; }
+.phase-track { height: 3px; background: var(--sur2); border-radius: 3px; overflow: hidden; }
+.phase-fill  { height: 100%; border-radius: 3px; transition: width .5s linear; background: linear-gradient(90deg,var(--teal2),var(--teal)); }
+.phase-fill.a{ background: linear-gradient(90deg,var(--amber2),var(--amber)); }
+.phase-fill.g{ background: linear-gradient(90deg,var(--green2),var(--green)); }
+.phase-fill.v{ background: linear-gradient(90deg,#7058cc,var(--violet)); }
+
+/* ── QUEUE ─────────────────────────────────────────────── */
+.queue-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+.q-item {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--sur2); border: 1px solid var(--b0);
+  border-radius: var(--r-sm); padding: 7px 8px;
+  transition: all .2s;
+}
+.q-item.q-target { border-color: rgba(0,229,195,.35); background: rgba(0,229,195,.04); }
+.q-dir {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; flex-shrink: 0;
+  background: rgba(0,229,195,.1); color: var(--teal);
+}
+.q-body { flex: 1; min-width: 0; }
+.q-id   { font-size: 9.5px; font-weight: 700; }
+.q-meta { font-size: 8px; color: var(--muted); font-family: var(--m); margin-top: 1px; }
+.q-badge {
+  padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0;
+}
+.q-badge.WAITING   { background:rgba(74,88,112,.15);  color:var(--muted); }
+.q-badge.ACTIVE    { background:rgba(0,224,122,.12);  color:var(--green); }
+.q-badge.SELECTED  { background:rgba(0,229,195,.12);  color:var(--teal); }
+.q-badge.HELD      { background:rgba(255,176,32,.1);  color:var(--amber); }
+.q-badge.PASSED    { background:rgba(167,139,255,.1); color:var(--violet); }
+.q-badge.CANCELLED { background:rgba(255,69,96,.1);  color:var(--red); }
+.q-badge.REJECTED  { background:rgba(255,69,96,.07); color:#cc3344; }
+
+/* ── EVENT LOG ─────────────────────────────────────────── */
+.ev-log {
+  display: flex; flex-direction: column; gap: 1px;
+  max-height: 160px; overflow-y: auto;
+}
+.ev-row {
+  display: flex; gap: 5px; align-items: baseline;
+  padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.02);
+}
+.ev-ts   { font-family:var(--m); font-size:8px; color:var(--muted); flex-shrink:0; }
+.ev-type { font-family:var(--m); font-size:8px; font-weight:700; color:var(--teal); flex-shrink:0; }
+.ev-type.GPS_PACKET { display:none; }
+.ev-msg  { font-size:8px; color:#5a7090; flex:1; word-break:break-word; }
+
+/* ── JUNCTION CANVAS ───────────────────────────────────── */
+#cv-wrap {
+  position: relative;
+  width: min(490px, 86vw); aspect-ratio: 1;
+  flex-shrink: 0;
+}
+#jc {
+  width: 100%; height: 100%; display: block;
+  border-radius: var(--r-xl);
+  box-shadow: 0 0 0 1px rgba(0,229,195,.18), 0 0 50px rgba(0,229,195,.05);
+}
+#cv-badge {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,229,195,.12); border: 1px solid rgba(0,229,195,.35);
+  border-radius: 20px; padding: 2px 9px;
+  font-size: 9px; font-weight: 700; color: var(--teal);
+  backdrop-filter: blur(8px); display: none;
+}
+.cv-label {
+  font-size: 9px; color: var(--muted); text-align: center;
+  font-family: var(--m); letter-spacing: .5px;
+}
+
+/* ── MQTT CONNECT INDICATOR ────────────────────────────── */
+#mqtt-panel {
+  background: var(--sur); border: 1px solid var(--b1);
+  border-radius: var(--r-lg); padding: 8px 11px;
+}
+.mqtt-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.mqtt-amb-list { display: flex; flex-direction: column; gap: 3px; }
+.mqtt-amb-row {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--sur2); border-radius: var(--r-xs);
+  padding: 4px 8px; font-size: 9px;
+}
+.mqtt-amb-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); flex-shrink:0; animation: siren .6s ease-in-out infinite alternate; }
+.mqtt-empty { font-size: 9px; color: var(--muted); text-align: center; padding: 6px 0; }
+
+/* ── EMPTY / LOADING ───────────────────────────────────── */
+.empty { text-align: center; color: var(--muted); font-size: 10px; padding: 12px 0; }
+
+/* ── TOAST ─────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,229,195,.14); border: 1px solid rgba(0,229,195,.4);
+  border-radius: 30px; padding: 6px 16px;
+  font-size: 10px; font-weight: 700; color: var(--teal);
+  backdrop-filter: blur(12px); opacity: 0; pointer-events: none;
+  transition: opacity .3s ease; z-index: 999; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* ── RESPONSIVE ────────────────────────────────────────── */
+@media (max-width: 900px) {
+  #main { grid-template-columns: 1fr; overflow-y: auto; }
+  body, #app { overflow: auto; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════════════════════════════════
+     TOP BAR
+     ══════════════════════════════════════════ -->
+<header id="topbar">
+  <div class="brand">
+    <div class="brand-mark">LL</div>
+    <div class="brand-text">
+      <div class="brand-name">LifeLane</div>
+      <div class="brand-sub">Junction Command Centre</div>
+    </div>
+  </div>
+
+  <div class="tb-div"></div>
+
+  <!-- Workflow pipeline summary in topbar -->
+  <div id="tb-pipe">
+    <div class="pipe-step" id="ps-mqtt"><div class="pipe-dot"></div>MQTT</div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" id="ps-gps"><div class="pipe-dot"></div>GPS</div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" id="ps-queue"><div class="pipe-dot"></div>QUEUE</div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" id="ps-signal"><div class="pipe-dot"></div>SIGNAL</div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step" id="ps-clear"><div class="pipe-dot"></div>CLEAR</div>
+  </div>
+
+  <div class="tb-spacer"></div>
+
+  <span id="preemption-badge" class="phase-normal">NORMAL CYCLE</span>
+
+  <div class="tb-div"></div>
+
+  <div class="tb-chip">
+    <span class="tb-chip-val" id="tb-remaining" style="color:var(--teal)">--</span>
+    <span class="tb-chip-label">Timer</span>
+  </div>
+
+  <div class="tb-div"></div>
+
+  <div class="tb-chip">
+    <span class="tb-chip-val" id="tb-target" style="color:var(--amber)">--</span>
+    <span class="tb-chip-label">Active Unit</span>
+  </div>
+
+  <div class="tb-div"></div>
+
+  <!-- MQTT connection badge -->
+  <div id="tb-mqtt-badge" class="warn">
+    <div class="mqtt-dot warn" id="mqtt-conn-dot"></div>
+    <span id="mqtt-conn-label">Connecting…</span>
+  </div>
+
+  <div id="tb-clock">--:--:--</div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     ANIMATED WORKFLOW PIPELINE BAR
+     ══════════════════════════════════════════ -->
+<div id="workflow-bar">
+  <div class="wf-stage" id="wf-app">
+    <span class="wf-icon">📱</span>APP CONNECTED
+  </div>
+  <div class="wf-arrow" id="wa-1">→</div>
+  <div class="wf-stage" id="wf-mqtt">
+    <span class="wf-icon">📡</span>MQTT BROKER
+  </div>
+  <div class="wf-arrow" id="wa-2">→</div>
+  <div class="wf-stage" id="wf-gps">
+    <span class="wf-icon">🛰️</span>GPS TELEMETRY
+  </div>
+  <div class="wf-arrow" id="wa-3">→</div>
+  <div class="wf-stage" id="wf-detect">
+    <span class="wf-icon">🎯</span>APPROACH DETECTED
+  </div>
+  <div class="wf-arrow" id="wa-4">→</div>
+  <div class="wf-stage" id="wf-queue">
+    <span class="wf-icon">📋</span>PRIORITY QUEUE
+  </div>
+  <div class="wf-arrow" id="wa-5">→</div>
+  <div class="wf-stage" id="wf-preempt">
+    <span class="wf-icon">⚡</span>PREEMPTION
+  </div>
+  <div class="wf-arrow" id="wa-6">→</div>
+  <div class="wf-stage" id="wf-green">
+    <span class="wf-icon">🟢</span>GREEN WAVE
+  </div>
+  <div class="wf-arrow" id="wa-7">→</div>
+  <div class="wf-stage" id="wf-pass">
+    <span class="wf-icon">✅</span>JUNCTION CLEARED
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN LAYOUT
+     ══════════════════════════════════════════ -->
+<div id="main">
+
+  <!-- ── LEFT PANEL ─────────────────────────────────────── -->
+  <aside class="panel" id="left-panel">
+
+    <!-- Traffic Signals -->
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-title"><div class="ct-dot"></div>Traffic Signals</div>
+        <div class="card-badge live" id="sig-badge">LIVE</div>
+      </div>
+      <div class="signal-grid">
+        <div class="sig-cell" id="sc-NORTH">
+          <div class="sig-head">
+            <div class="sig-lamp R" id="l-N-R"></div>
+            <div class="sig-lamp A" id="l-N-A"></div>
+            <div class="sig-lamp G" id="l-N-G"></div>
+          </div>
+          <div class="sig-label">NORTH</div>
+        </div>
+        <div class="sig-cell" id="sc-SOUTH">
+          <div class="sig-head">
+            <div class="sig-lamp R" id="l-S-R"></div>
+            <div class="sig-lamp A" id="l-S-A"></div>
+            <div class="sig-lamp G" id="l-S-G"></div>
+          </div>
+          <div class="sig-label">SOUTH</div>
+        </div>
+        <div class="sig-cell" id="sc-EAST">
+          <div class="sig-head">
+            <div class="sig-lamp R" id="l-E-R"></div>
+            <div class="sig-lamp A" id="l-E-A"></div>
+            <div class="sig-lamp G" id="l-E-G"></div>
+          </div>
+          <div class="sig-label">EAST</div>
+        </div>
+        <div class="sig-cell" id="sc-WEST">
+          <div class="sig-head">
+            <div class="sig-lamp R" id="l-W-R"></div>
+            <div class="sig-lamp A" id="l-W-A"></div>
+            <div class="sig-lamp G" id="l-W-G"></div>
+          </div>
+          <div class="sig-label">WEST</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MQTT Connected Ambulances -->
+    <div class="card" id="mqtt-panel">
+      <div class="mqtt-header">
+        <div class="card-title"><div class="ct-dot"></div>Connected Ambulances</div>
+        <div class="card-badge" id="mqtt-amb-count">0 online</div>
+      </div>
+      <div class="mqtt-amb-list" id="mqtt-amb-list">
+        <div class="mqtt-empty" id="mqtt-empty">No ambulances connected via MQTT</div>
+      </div>
+    </div>
+
+    <!-- Signal Controls -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Signal Cycle Control</div>
+      <div class="btn-row" style="margin-bottom:5px">
+        <button class="btn primary" onclick="apiAction('/api/signal/cycle',{action:'start'},'Signal cycle started')">▶ Start</button>
+        <button class="btn"         onclick="apiAction('/api/signal/cycle',{action:'pause'},'Cycle paused')">⏸ Pause</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn danger" onclick="apiAction('/api/signal/override',{action:'ALL_RED'},'All-Red halt')">🔴 All-Red</button>
+        <button class="btn warn"   onclick="apiAction('/api/signal/reset',null,'Junction reset')">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- Deploy Simulation -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Deploy Simulation</div>
+      <div class="spawn-grid">
+        <button class="spawn-btn N" onclick="spawn('NORTH')"><span class="sa">↓</span>North</button>
+        <button class="spawn-btn S" onclick="spawn('SOUTH')"><span class="sa">↑</span>South</button>
+        <button class="spawn-btn E" onclick="spawn('EAST')"><span class="sa">←</span>East</button>
+        <button class="spawn-btn W" onclick="spawn('WEST')"><span class="sa">→</span>West</button>
+      </div>
+      <div style="margin-top:7px">
+        <div class="card-title" style="margin-bottom:5px">Priority</div>
+        <div class="prio-row">
+          <button class="prio-pill RED on"    id="pp-RED"    onclick="selPrio('RED')">CRITICAL</button>
+          <button class="prio-pill YELLOW"    id="pp-YELLOW" onclick="selPrio('YELLOW')">SERIOUS</button>
+          <button class="prio-pill GREEN"     id="pp-GREEN"  onclick="selPrio('GREEN')">STABLE</button>
+        </div>
+      </div>
+      <div class="speed-row">
+        <label>Speed</label>
+        <input type="range" id="speed-slider" min="5" max="30" value="12"
+               oninput="document.getElementById('speed-val').textContent=this.value+' m/s'">
+        <span id="speed-val">12 m/s</span>
+      </div>
+      <button class="btn danger" style="width:100%;margin-top:6px"
+              onclick="apiAction('/api/simulate/clear',null,'All ambulances cleared')">✕ Clear All</button>
+    </div>
+
+    <!-- On-Track Units -->
+    <div class="card" id="units-card" style="display:none">
+      <div class="card-hd">
+        <div class="card-title"><div class="ct-dot"></div>On-Track Units</div>
+        <div class="card-badge live" id="units-count">0</div>
+      </div>
+      <div class="amb-list" id="amb-list"></div>
+    </div>
+
+  </aside>
+
+  <!-- ── CENTRE (CANVAS) ────────────────────────────────── -->
+  <section id="center-panel">
+    <div id="cv-wrap">
+      <canvas id="jc"></canvas>
+      <div id="cv-badge">0 units</div>
+    </div>
+    <div class="cv-label">LifeLane · JN-001 · 4-Way Junction Simulator</div>
+  </section>
+
+  <!-- ── RIGHT PANEL ────────────────────────────────────── -->
+  <aside class="panel" id="right-panel">
+
+    <!-- Active Telemetry -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Active Telemetry</div>
+      <div class="metric-grid">
+        <div class="metric-box" id="mb-dist">
+          <div class="metric-lbl">Distance</div>
+          <div class="metric-val" id="m-dist"><span class="muted">--</span></div>
+          <span class="metric-unit">m</span>
+        </div>
+        <div class="metric-box" id="mb-eta">
+          <div class="metric-lbl">ETA</div>
+          <div class="metric-val amber" id="m-eta"><span class="muted">--</span></div>
+          <span class="metric-unit">s</span>
+        </div>
+        <div class="metric-box" id="mb-spd">
+          <div class="metric-lbl">Speed</div>
+          <div class="metric-val" id="m-spd"><span class="muted">--</span></div>
+          <span class="metric-unit">m/s</span>
+        </div>
+        <div class="metric-box" id="mb-dir">
+          <div class="metric-lbl">Approach</div>
+          <div class="metric-val" id="m-dir" style="font-size:13px"><span class="muted">--</span></div>
+        </div>
+      </div>
+      <div class="phase-wrap">
+        <div class="phase-hd">
+          <span id="phase-lbl">Phase</span>
+          <span id="phase-rem">--</span>
+        </div>
+        <div class="phase-track">
+          <div class="phase-fill" id="phase-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emergency Queue -->
+    <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+      <div class="card-hd" style="margin-bottom:6px">
+        <div class="card-title"><div class="ct-dot"></div>Emergency Queue</div>
+        <div class="card-badge" id="q-count">0</div>
+      </div>
+      <div class="queue-wrap" id="queue-list">
+        <div class="empty" id="queue-empty">No active emergency requests</div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:7px"><div class="ct-dot"></div>Event Log</div>
+      <div class="ev-log" id="ev-log"></div>
+    </div>
+
+  </aside>
+</div><!-- #main -->
+</div><!-- #app -->
+
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────────────────
+var S = null, selPrio_ = 'RED', evSrc = null, reconnDelay = 1000;
+var ambTrack = new Map();
+
+// ── CLOCK ──────────────────────────────────────────────────
+function tick(){document.getElementById('tb-clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+setInterval(tick,1000); tick();
+
+// ── TOAST ──────────────────────────────────────────────────
+var _tt;
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(function(){el.classList.remove('show');},2400);
+}
+
+// ── API ────────────────────────────────────────────────────
+async function api(method,path,body){
+  try{
+    var opts={method:method};
+    if(body){opts.headers={'Content-Type':'application/json'};opts.body=JSON.stringify(body);}
+    return await (await fetch(path,opts)).json();
+  }catch(e){console.warn('API',path,e);return null;}
+}
+async function apiAction(path,body,msg){if(await api('POST',path,body))toast(msg);}
+
+function selPrio(p){
+  selPrio_=p;
+  ['RED','YELLOW','GREEN'].forEach(function(x){
+    document.getElementById('pp-'+x).classList.toggle('on',x===p);
+  });
+}
+async function spawn(side){
+  var speed=parseFloat(document.getElementById('speed-slider').value);
+  var r=await api('POST','/api/simulate/spawn',{side:side,priority:selPrio_,speed_mps:speed});
+  if(r&&r.ok) toast('🚑 '+r.ambulance_id+' deployed from '+side);
+  else toast('⚠ Spawn failed');
+}
+
+// ── SSE CONNECTION ──────────────────────────────────────────
+function connect(){
+  if(evSrc){evSrc.close(); evSrc=null;}
+  setConn('warn','Connecting…');
+  evSrc=new EventSource('/api/stream');
+  evSrc.onopen=function(){setConn('live','Live'); reconnDelay=1000;};
+  evSrc.onmessage=function(e){
+    try{
+      var d=JSON.parse(e.data);
+      if(d.kind==='state') applyState(d);
+      else if(d.kind==='event') prependEvent(d.payload);
+    }catch(err){console.error(err);}
+  };
+  evSrc.onerror=function(){
+    setConn('dead','Reconnecting…');
+    evSrc.close(); evSrc=null;
+    setTimeout(connect,reconnDelay);
+    reconnDelay=Math.min(reconnDelay*1.5,10000);
+  };
+}
+
+function setConn(cls,lbl){
+  var badge=document.getElementById('tb-mqtt-badge');
+  var dot=document.getElementById('mqtt-conn-dot');
+  var label=document.getElementById('mqtt-conn-label');
+  badge.className=cls;
+  dot.className='mqtt-dot '+cls;
+  label.textContent=lbl;
+}
+
+// ── MAIN STATE APPLY ────────────────────────────────────────
+function applyState(s){
+  S=s;
+  applySignals(s.signals, s.ambulances||[]);
+  applyBadge(s);
+  applyMetrics(s);
+  applyQueue(s.queue||[], s.target_trip);
+  syncAmbs(s.ambulances||[]);
+  applyAmbList(s.ambulances||[]);
+  applyMqttAmbs(s.ambulances||[]);
+  applyWorkflow(s);
+  if(s.events) fillEventLog(s.events);
+  updatePipeSteps(s);
+}
+
+// ── SIGNAL LAMPS ───────────────────────────────────────────
+var SIDE_ID={'NORTH':'N','SOUTH':'S','EAST':'E','WEST':'W'};
+function applySignals(sigs, ambs){
+  var sides=['NORTH','SOUTH','EAST','WEST'];
+  sides.forEach(function(side){
+    var col=(sigs[side]||'red').toLowerCase();
+    var sid=SIDE_ID[side];
+    // Lamp state
+    ['R','A','G'].forEach(function(l){
+      var lc={'R':'red','A':'amber','G':'green'}[l];
+      var on=col===lc||(l==='A'&&col==='amber')||(l==='G'&&col==='green');
+      document.getElementById('l-'+sid+'-'+l).classList.toggle('on',col===lc);
+    });
+    // Cell glow
+    var cell=document.getElementById('sc-'+side);
+    cell.className='sig-cell'+(col==='green'?' green-active':col==='red'?' red-active':'');
+  });
+}
+
+// ── PREEMPTION BADGE + PHASE BAR ───────────────────────────
+var PHASE_LBL={
+  NORMAL:'NORMAL CYCLE',REQUEST_VALIDATION:'VALIDATING',
+  PREEMPTION_PENDING:'PREEMPTION PENDING',CLEAR_CURRENT_GREEN:'CLEARING GREEN',
+  ALL_RED_CLEARANCE:'ALL-RED CLEARANCE',AMBULANCE_GREEN:'🟢 AMBULANCE GREEN',
+  PASSAGE_MONITORING:'PASSAGE MONITORING',RECOVERY_YELLOW:'RECOVERY YELLOW',
+  RECOVERY_ALL_RED:'RECOVERY ALL-RED',RETURN_TO_NORMAL:'RETURNING',FAIL_SAFE:'⚠ FAIL-SAFE'
+};
+var PHASE_MAX={
+  NS_GREEN:10,NS_YELLOW:2,ALL_RED_BEFORE_EW:1,EW_GREEN:10,EW_YELLOW:2,ALL_RED_BEFORE_NS:1,
+  AMBULANCE_GREEN:20,PASSAGE_MONITORING:20,CLEAR_CURRENT_GREEN:2,
+  RECOVERY_YELLOW:2,ALL_RED_CLEARANCE:1,RECOVERY_ALL_RED:1,PREEMPTION_PENDING:4
+};
+
+function applyBadge(s){
+  var badge=document.getElementById('preemption-badge');
+  var ps=s.preemption_state||'NORMAL';
+  badge.textContent=PHASE_LBL[ps]||ps;
+  var cls='phase-normal';
+  if(ps==='FAIL_SAFE') cls='phase-fail';
+  else if(ps==='AMBULANCE_GREEN'||ps==='PASSAGE_MONITORING') cls='phase-green';
+  else if(['REQUEST_VALIDATION','PREEMPTION_PENDING','CLEAR_CURRENT_GREEN','ALL_RED_CLEARANCE'].indexOf(ps)>=0) cls='phase-preempt';
+  else if(['RECOVERY_YELLOW','RECOVERY_ALL_RED'].indexOf(ps)>=0) cls='phase-recovery';
+  badge.className=cls;
+
+  var rem=s.remaining_s;
+  var key=s.normal_phase||ps;
+  document.getElementById('phase-lbl').textContent=PHASE_LBL[key]||key;
+  var fill=document.getElementById('phase-fill');
+  if(rem!==null&&rem!==undefined){
+    document.getElementById('tb-remaining').textContent=rem.toFixed(1)+'s';
+    document.getElementById('phase-rem').textContent=rem.toFixed(1)+'s';
+    var max=PHASE_MAX[key]||10;
+    fill.style.width=Math.min(100,Math.max(0,100*rem/max))+'%';
+    fill.className='phase-fill';
+    if(cls==='phase-green') fill.classList.add('g');
+    else if(ps.indexOf('YELLOW')>=0||ps.indexOf('AMBER')>=0) fill.classList.add('a');
+    else if(cls==='phase-recovery') fill.classList.add('v');
+  } else {
+    document.getElementById('tb-remaining').textContent='--';
+    document.getElementById('phase-rem').textContent='--';
+    fill.style.width='0%';
+  }
+  var tgt=s.target?s.target.ambulance_id:(s.target_trip?s.target_trip.slice(-8):'--');
+  document.getElementById('tb-target').textContent=tgt;
+}
+
+// ── TELEMETRY METRICS ───────────────────────────────────────
+function applyMetrics(s){
+  var t=s.target||{}, has=!!s.target_trip;
+  setM('m-dist', t.distance_m!==undefined?Math.round(t.distance_m):null);
+  setM('m-eta',  t.eta_s!==undefined?t.eta_s.toFixed(0):null);
+  setM('m-spd',  t.speed_mps!==undefined?t.speed_mps.toFixed(1):null);
+  var dir=document.getElementById('m-dir');
+  if(t.approach){
+    var ar={NORTH:'↓',SOUTH:'↑',EAST:'←',WEST:'→'};
+    dir.textContent=(ar[t.approach]||'')+' '+t.approach;
+  } else {
+    dir.innerHTML='<span class="muted">--</span>';
+  }
+  ['mb-dist','mb-eta','mb-spd','mb-dir'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.classList.toggle('hl',has);
+  });
+}
+function setM(id,val){
+  var el=document.getElementById(id);
+  if(!el) return;
+  el.innerHTML=val===null||val===undefined?'<span class="muted">--</span>':val;
+}
+
+// ── QUEUE ──────────────────────────────────────────────────
+var DIR_ARROW={NORTH:'↓',SOUTH:'↑',EAST:'←',WEST:'→'};
+var PRIO_CLR={RED:'var(--red)',YELLOW:'var(--amber)',GREEN:'var(--green)'};
+
+function applyQueue(queue, targetTrip){
+  var list=document.getElementById('queue-list');
+  var empty=document.getElementById('queue-empty');
+  var badge=document.getElementById('q-count');
+  badge.textContent=queue.length;
+  if(!queue.length){
+    empty.style.display='block';
+    list.querySelectorAll('.q-item').forEach(function(e){e.remove();});
+    return;
+  }
+  empty.style.display='none';
+  var ex={};
+  list.querySelectorAll('.q-item').forEach(function(e){ex[e.dataset.trip]=e;});
+  Object.keys(ex).forEach(function(id){
+    if(!queue.find(function(q){return q.trip_id===id;})) ex[id].remove();
+  });
+  queue.forEach(function(req){
+    var item=ex[req.trip_id];
+    if(!item){
+      item=document.createElement('div');
+      item.className='q-item'; item.dataset.trip=req.trip_id;
+      item.innerHTML=
+        '<div class="q-dir"></div>'+
+        '<div class="q-body"><div class="q-id"></div><div class="q-meta"></div></div>'+
+        '<div class="q-badge"></div>';
+      list.appendChild(item);
+    }
+    item.classList.toggle('q-target', req.trip_id===targetTrip);
+    var dir=item.querySelector('.q-dir');
+    dir.textContent=DIR_ARROW[req.approach]||req.approach.slice(0,1);
+    dir.style.color=PRIO_CLR[req.priority]||'var(--teal)';
+    dir.style.background=(PRIO_CLR[req.priority]||'rgba(0,229,195,1)')+'18';
+    item.querySelector('.q-id').textContent=req.ambulance_id;
+    item.querySelector('.q-meta').textContent=
+      Math.round(req.distance_m)+'m  ETA '+(req.eta_s!==null?req.eta_s.toFixed(0)+'s':'?')+'  wait '+req.waiting_s.toFixed(0)+'s';
+    var b=item.querySelector('.q-badge');
+    b.textContent=req.status; b.className='q-badge '+req.status;
+  });
+}
+
+// ── AMBULANCE LIST (left panel) ─────────────────────────────
+function applyAmbList(ambs){
+  var active=ambs.filter(function(a){return a.active;});
+  var card=document.getElementById('units-card');
+  var list=document.getElementById('amb-list');
+  var badge=document.getElementById('units-count');
+  var cvBadge=document.getElementById('cv-badge');
+  if(!active.length){
+    card.style.display='none'; cvBadge.style.display='none'; return;
+  }
+  card.style.display='block'; cvBadge.style.display='block';
+  badge.textContent=active.length;
+  cvBadge.textContent=active.length+' unit'+(active.length>1?'s':'');
+  var ex={};
+  list.querySelectorAll('.amb-row').forEach(function(r){ex[r.dataset.trip]=r;});
+  Object.keys(ex).forEach(function(id){
+    if(!active.find(function(a){return a.trip_id===id;})) ex[id].remove();
+  });
+  var tgt=S&&S.target_trip;
+  active.forEach(function(a){
+    var row=ex[a.trip_id];
+    if(!row){
+      row=document.createElement('div');
+      row.className='amb-row'; row.dataset.trip=a.trip_id;
+      row.innerHTML=
+        '<div class="amb-siren"></div>'+
+        '<div class="amb-info"><div class="amb-name"></div><div class="amb-meta"></div></div>'+
+        '<div class="dir-badge"></div>';
+      list.appendChild(row);
+    }
+    row.classList.toggle('target-row', a.trip_id===tgt);
+    row.querySelector('.amb-siren').className='amb-siren '+a.priority;
+    row.querySelector('.amb-name').textContent=a.id;
+    row.querySelector('.amb-meta').textContent=Math.max(0,a.dist_m).toFixed(0)+'m · '+a.speed_mps+'m/s';
+    row.querySelector('.dir-badge').textContent=a.side;
+  });
+}
+
+// ── MQTT AMBULANCE INDICATOR ────────────────────────────────
+function applyMqttAmbs(ambs){
+  var active=ambs.filter(function(a){return a.active;});
+  var list=document.getElementById('mqtt-amb-list');
+  var empty=document.getElementById('mqtt-empty');
+  var countBadge=document.getElementById('mqtt-amb-count');
+  countBadge.textContent=active.length+' online';
+  countBadge.className='card-badge'+(active.length?' live':'');
+  if(!active.length){
+    empty.style.display='block';
+    list.querySelectorAll('.mqtt-amb-row').forEach(function(r){r.remove();});
+    return;
+  }
+  empty.style.display='none';
+  var ex={};
+  list.querySelectorAll('.mqtt-amb-row').forEach(function(r){ex[r.dataset.trip]=r;});
+  Object.keys(ex).forEach(function(id){
+    if(!active.find(function(a){return a.trip_id===id;})) ex[id].remove();
+  });
+  active.forEach(function(a){
+    var row=ex[a.trip_id];
+    if(!row){
+      row=document.createElement('div');
+      row.className='mqtt-amb-row'; row.dataset.trip=a.trip_id;
+      row.innerHTML=
+        '<div class="mqtt-amb-dot"></div>'+
+        '<span style="font-weight:700;font-size:9px;flex:1"></span>'+
+        '<span style="font-family:var(--m);font-size:8px;color:var(--muted)"></span>'+
+        '<span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px"></span>';
+      list.appendChild(row);
+    }
+    var spans=row.querySelectorAll('span');
+    spans[0].textContent=a.id;
+    spans[1].textContent=Math.max(0,a.dist_m).toFixed(0)+'m';
+    spans[2].textContent=a.priority;
+    spans[2].style.background=({RED:'rgba(255,69,96,.15)',YELLOW:'rgba(255,176,32,.12)',GREEN:'rgba(0,224,122,.12)'}[a.priority])||'rgba(0,229,195,.1)';
+    spans[2].style.color=({RED:'var(--red)',YELLOW:'var(--amber)',GREEN:'var(--green)'}[a.priority])||'var(--teal)';
+  });
+}
+
+// ── WORKFLOW PIPELINE ───────────────────────────────────────
+function applyWorkflow(s){
+  var ps=s.preemption_state||'NORMAL';
+  var ambs=s.ambulances||[];
+  var hasAmb=ambs.some(function(a){return a.active;});
+  var hasQueue=(s.queue||[]).length>0;
+  var hasTgt=!!s.target_trip;
+
+  setWf('wf-app',  true,    false, false);
+  setWf('wf-mqtt', true,    false, false);
+  setWf('wf-gps',  hasAmb,  false, false);
+  setWf('wf-detect',hasAmb&&hasTgt, false, false);
+  setWf('wf-queue', hasQueue, false, false);
+  var preempting=['REQUEST_VALIDATION','PREEMPTION_PENDING','CLEAR_CURRENT_GREEN','ALL_RED_CLEARANCE'].indexOf(ps)>=0;
+  var greening=ps==='AMBULANCE_GREEN'||ps==='PASSAGE_MONITORING';
+  var passed=ps==='RETURN_TO_NORMAL'||ps==='NORMAL';
+  setWf('wf-preempt', preempting||greening, greening||passed, ps==='FAIL_SAFE');
+  setWf('wf-green', greening, passed, false);
+  setWf('wf-pass', passed&&hasTgt===false&&hasQueue===false, false, false);
+
+  // Arrows light up when source stage is active
+  [1,2,3,4,5,6,7].forEach(function(i){
+    var src=document.getElementById('wf-'+['app','mqtt','gps','detect','queue','preempt','green','pass'][i-1]);
+    var arr=document.getElementById('wa-'+i);
+    if(arr) arr.className='wf-arrow'+(src&&src.classList.contains('active')?' lit':'');
+  });
+
+  // Topbar pipe steps
+  setPs('ps-mqtt', hasAmb);
+  setPs('ps-gps',  hasAmb&&hasTgt);
+  setPs('ps-queue',hasQueue);
+  setPs('ps-signal',greening||preempting);
+  setPs('ps-clear', ps==='RETURN_TO_NORMAL');
+}
+function setWf(id, active, done, alert){
+  var el=document.getElementById(id);
+  if(!el) return;
+  el.className='wf-stage'+(alert?' alert':done?' done':active?' active':'');
+}
+function setPs(id, active){
+  var el=document.getElementById(id);
+  if(el) el.className='pipe-step'+(active?' active':'');
+}
+
+// ── EVENT LOG ───────────────────────────────────────────────
+function fillEventLog(events){
+  document.getElementById('ev-log').innerHTML=
+    [...events].reverse().map(function(e){
+      return '<div class="ev-row"><span class="ev-ts">'+e.ts+'</span><span class="ev-type '+e.type+'">'+e.type+'</span><span class="ev-msg">'+e.msg+'</span></div>';
+    }).join('');
+}
+function prependEvent(entry){
+  var log=document.getElementById('ev-log');
+  var row=document.createElement('div');
+  row.className='ev-row';
+  row.innerHTML='<span class="ev-ts">'+entry.ts+'</span><span class="ev-type '+entry.type+'">'+entry.type+'</span><span class="ev-msg">'+entry.msg+'</span>';
+  log.insertBefore(row,log.firstChild);
+  while(log.children.length>80) log.removeChild(log.lastChild);
+}
+
+// ── AMB TRACKER ─────────────────────────────────────────────
+function syncAmbs(ambs){
+  var now=performance.now();
+  var seen=new Set();
+  ambs.forEach(function(a){
+    if(!a.active) return;
+    seen.add(a.trip_id);
+    var ex=ambTrack.get(a.trip_id);
+    if(ex){
+      ex.dist_m=a.dist_m; ex.speed_mps=a.speed_mps||ex.speed_mps;
+      ex.lastUpdate=now; ex.side=a.side; ex.priority=a.priority; ex.id=a.id;
+    } else {
+      ambTrack.set(a.trip_id,{trip_id:a.trip_id,id:a.id,side:a.side,
+        dist_m:a.dist_m,speed_mps:a.speed_mps||12,priority:a.priority,lastUpdate:now});
+    }
+  });
+  ambTrack.forEach(function(_,id){if(!seen.has(id)) ambTrack.delete(id);});
+}
+
+// ── TOPBAR PIPE STEP HELPER ─────────────────────────────────
+function updatePipeSteps(s){}  // handled in applyWorkflow
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS RENDERER  –  60 fps
+// ═══════════════════════════════════════════════════════════
+var cv=document.getElementById('jc');
+var cx=cv.getContext('2d');
+var SZ=500; cv.width=SZ; cv.height=SZ;
+var CX=SZ/2, CY=SZ/2;
+var RW=84;    // road width px
+var SC=0.37;  // pixels per metre
+
+function rrect(c,x,y,w,h,r){
+  c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);
+  c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);
+  c.quadraticCurveTo(x,y,x+r,y);c.closePath();
+}
+
+function sig(side){if(!S||!S.signals)return 'red';return(S.signals[side]||'red').toLowerCase();}
+
+function drawSigHead(x,y,col){
+  cx.save(); cx.translate(x,y);
+  // Housing
+  rrect(cx,-6,-17,12,34,3);
+  cx.fillStyle='#06080e'; cx.strokeStyle='#1a2030'; cx.lineWidth=1.5;
+  cx.fill(); cx.stroke();
+  // Lamps
+  [{oy:-11,c:'red',on:col==='red'},{oy:0,c:'amber',on:col==='amber'||col==='yellow'},{oy:11,c:'green',on:col==='green'}].forEach(function(l){
+    cx.beginPath(); cx.arc(0,l.oy,3.8,0,Math.PI*2);
+    if(l.on){
+      cx.fillStyle={red:'#ff2233',amber:'#ffb020',green:'#00e676'}[l.c];
+      cx.shadowColor={red:'rgba(255,34,51,.9)',amber:'rgba(255,176,32,.9)',green:'rgba(0,230,118,.9)'}[l.c];
+      cx.shadowBlur=16;
+    } else {
+      cx.fillStyle='#111420'; cx.shadowBlur=0;
+    }
+    cx.fill(); cx.shadowBlur=0;
+  });
+  cx.restore();
+}
+
+function drawAmbulance(x,y,prio,label,isTarget){
+  var ac=prio==='RED'?'#ff4560':prio==='YELLOW'?'#ffb020':'#00e07a';
+  var t=performance.now();
+  cx.save(); cx.translate(x,y);
+  // Aura
+  var ar=isTarget?24:16, ps=isTarget?(1+0.12*Math.sin(t/200)):1;
+  var g=cx.createRadialGradient(0,0,2,0,0,ar*ps);
+  g.addColorStop(0,ac+'60'); g.addColorStop(.65,ac+'25'); g.addColorStop(1,ac+'00');
+  cx.fillStyle=g; cx.beginPath(); cx.arc(0,0,ar*ps,0,Math.PI*2); cx.fill();
+  // Vehicle body
+  cx.shadowColor=ac; cx.shadowBlur=isTarget?20:10;
+  cx.fillStyle='#f0f4ff';
+  rrect(cx,-10,-6,20,12,2.5); cx.fill();
+  cx.shadowBlur=0;
+  // Red cross
+  cx.fillStyle='#ff2244';
+  cx.fillRect(-1.5,-5,3,10); cx.fillRect(-5,-1.5,10,3);
+  // Siren lights (animated)
+  var fl=((t|0)%500)<250;
+  cx.fillStyle=fl?'#ff2233':'#448ef0';
+  rrect(cx,-9,-9,7,3,1); cx.fill();
+  cx.fillStyle=fl?'#448ef0':'#ff2233';
+  rrect(cx,2,-9,7,3,1); cx.fill();
+  cx.restore();
+  // Label
+  cx.font='700 8px JetBrains Mono,monospace';
+  cx.textAlign='center'; cx.textBaseline='top';
+  var tw=cx.measureText(label).width+6;
+  cx.fillStyle='rgba(5,8,15,.82)';
+  rrect(cx,x-tw/2,y+10,tw,11,2); cx.fill();
+  cx.fillStyle=ac; cx.fillText(label,x,y+11);
+}
+
+function ambPos(a){
+  var elapsed=(performance.now()-a.lastUpdate)/1000;
+  var d=Math.max(0,a.dist_m-a.speed_mps*elapsed)*SC;
+  var h=RW/2;
+  if(a.side==='NORTH') return{x:CX,   y:CY-d};
+  if(a.side==='SOUTH') return{x:CX,   y:CY+d};
+  if(a.side==='EAST')  return{x:CX+d, y:CY};
+  /* WEST */           return{x:CX-d, y:CY};
+}
+
+function drawZebra(x1,y1,x2,y2,horiz){
+  var stripes=4, sw=3;
+  cx.save(); cx.strokeStyle='rgba(255,255,255,.18)'; cx.lineWidth=sw;
+  for(var i=0;i<stripes;i++){
+    var t=i/stripes;
+    var nx=x1+(x2-x1)*t, ny=y1+(y2-y1)*t;
+    cx.beginPath();
+    if(horiz){cx.moveTo(nx,ny-8);cx.lineTo(nx,ny+8);}
+    else{cx.moveTo(nx-8,ny);cx.lineTo(nx+8,ny);}
+    cx.stroke();
+  }
+  cx.restore();
+}
+
+function drawFrame(){
+  cx.clearRect(0,0,SZ,SZ);
+  var h=RW/2;
+
+  // ── BACKGROUND ───────────────────────────────────────────
+  cx.fillStyle='#06090f'; cx.fillRect(0,0,SZ,SZ);
+
+  // Pavement blocks with slight texture
+  var blocks=[
+    [0,0,CX-h,CY-h], [CX+h,0,CX-h,CY-h],
+    [0,CY+h,CX-h,CY-h], [CX+h,CY+h,CX-h,CY-h]
+  ];
+  blocks.forEach(function(b){
+    cx.fillStyle='#0a0f1c'; cx.fillRect(b[0],b[1],b[2],b[3]);
+    // grid lines
+    cx.strokeStyle='rgba(255,255,255,.015)'; cx.lineWidth=1;
+    for(var gx=b[0];gx<b[0]+b[2];gx+=20){
+      cx.beginPath();cx.moveTo(gx,b[1]);cx.lineTo(gx,b[1]+b[3]);cx.stroke();
+    }
+    for(var gy=b[1];gy<b[1]+b[3];gy+=20){
+      cx.beginPath();cx.moveTo(b[0],gy);cx.lineTo(b[0]+b[2],gy);cx.stroke();
+    }
+  });
+
+  // ── ROADS ────────────────────────────────────────────────
+  cx.fillStyle='#0e1420';
+  cx.fillRect(CX-h, 0,   RW, SZ);  // N-S
+  cx.fillRect(0,   CY-h, SZ, RW);  // E-W
+
+  // Junction box
+  cx.fillStyle='#0b111f'; cx.fillRect(CX-h,CY-h,RW,RW);
+
+  // ── RADAR RINGS ──────────────────────────────────────────
+  function ring(r,fillA,strokeA,dash){
+    cx.beginPath(); cx.arc(CX,CY,r*SC,0,Math.PI*2);
+    if(fillA>0){cx.fillStyle='rgba(0,229,195,'+fillA+')';cx.fill();}
+    cx.strokeStyle='rgba(0,229,195,'+strokeA+')'; cx.lineWidth=1;
+    cx.setLineDash(dash||[]); cx.stroke(); cx.setLineDash([]);
+  }
+  ring(300,.02,.12,[8,10]);
+  ring(120,.04,.24,[5,6]);
+  ring(50, 0, .55,[3,4]);
+  // Range labels
+  cx.fillStyle='rgba(0,229,195,.25)'; cx.font='500 7px Inter,sans-serif';
+  cx.textAlign='left'; cx.textBaseline='middle';
+  cx.fillText('300m',CX+300*SC+3,CY-4);
+  cx.fillText('120m',CX+120*SC+3,CY-4);
+  cx.fillText('50m', CX+50*SC+3, CY-4);
+
+  // ── LANE MARKINGS ────────────────────────────────────────
+  cx.strokeStyle='rgba(255,255,255,.35)'; cx.lineWidth=1.5; cx.setLineDash([12,10]);
+  // N-S centre line
+  cx.beginPath();cx.moveTo(CX,0);cx.lineTo(CX,CY-h); cx.stroke();
+  cx.beginPath();cx.moveTo(CX,CY+h);cx.lineTo(CX,SZ); cx.stroke();
+  // E-W centre line
+  cx.beginPath();cx.moveTo(0,CY);cx.lineTo(CX-h,CY); cx.stroke();
+  cx.beginPath();cx.moveTo(CX+h,CY);cx.lineTo(SZ,CY); cx.stroke();
+  cx.setLineDash([]);
+
+  // ── STOP LINES ───────────────────────────────────────────
+  cx.strokeStyle='rgba(255,255,255,.7)'; cx.lineWidth=3;
+  cx.beginPath();cx.moveTo(CX-h+3,CY-h-5);cx.lineTo(CX+h-3,CY-h-5);cx.stroke(); // N
+  cx.beginPath();cx.moveTo(CX-h+3,CY+h+5);cx.lineTo(CX+h-3,CY+h+5);cx.stroke(); // S
+  cx.beginPath();cx.moveTo(CX+h+5,CY-h+3);cx.lineTo(CX+h+5,CY+h-3);cx.stroke(); // E
+  cx.beginPath();cx.moveTo(CX-h-5,CY-h+3);cx.lineTo(CX-h-5,CY+h-3);cx.stroke(); // W
+
+  // ── ZEBRA CROSSINGS ──────────────────────────────────────
+  drawZebra(CX-h+4,CY-h-10,CX+h-4,CY-h-10,false);
+  drawZebra(CX-h+4,CY+h+10,CX+h-4,CY+h+10,false);
+  drawZebra(CX+h+10,CY-h+4,CX+h+10,CY+h-4,true);
+  drawZebra(CX-h-10,CY-h+4,CX-h-10,CY+h-4,true);
+
+  // ── JUNCTION BOX ARROWS ──────────────────────────────────
+  cx.fillStyle='rgba(255,255,255,.07)';
+  cx.font='bold 13px Arial'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText('↕',CX,CY-4);  // N-S
+  cx.fillText('↔',CX,CY+4);  // E-W (overlapping trick)
+
+  // ── JUNCTION CENTRE DOT ──────────────────────────────────
+  cx.beginPath(); cx.arc(CX,CY,5,0,Math.PI*2);
+  var jg=cx.createRadialGradient(CX,CY,0,CX,CY,5);
+  jg.addColorStop(0,'rgba(0,229,195,.9)'); jg.addColorStop(1,'rgba(0,229,195,.1)');
+  cx.fillStyle=jg; cx.fill();
+
+  // ── SIGNAL HEADS ─────────────────────────────────────────
+  var so=h+22;
+  drawSigHead(CX-so, CY-so, sig('NORTH'));
+  drawSigHead(CX+so, CY+so, sig('SOUTH'));
+  drawSigHead(CX+so, CY-so, sig('EAST'));
+  drawSigHead(CX-so, CY+so, sig('WEST'));
+
+  // ── COMPASS ──────────────────────────────────────────────
+  cx.fillStyle='rgba(255,255,255,.22)'; cx.font='700 10px Inter,sans-serif';
+  cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText('N',CX,11); cx.fillText('S',CX,SZ-11);
+  cx.fillText('E',SZ-11,CY); cx.fillText('W',11,CY);
+
+  // ── AMBULANCES ───────────────────────────────────────────
+  var tgt=S&&S.target_trip;
+  ambTrack.forEach(function(a, tid){
+    var pos=ambPos(a);
+    var px=Math.max(10,Math.min(SZ-10,pos.x));
+    var py=Math.max(10,Math.min(SZ-10,pos.y));
+    var ac=a.priority==='RED'?'#ff4560':a.priority==='YELLOW'?'#ffb020':'#00e07a';
+    var isTarget=tid===tgt;
+
+    // Approach trail
+    cx.save(); cx.globalAlpha=.18; cx.strokeStyle=ac; cx.lineWidth=2;
+    cx.setLineDash([4,6]);
+    cx.beginPath(); cx.moveTo(px,py);
+    if(a.side==='NORTH') cx.lineTo(px,CY-h-5);
+    else if(a.side==='SOUTH') cx.lineTo(px,CY+h+5);
+    else if(a.side==='EAST')  cx.lineTo(CX+h+5,py);
+    else                       cx.lineTo(CX-h-5,py);
+    cx.stroke(); cx.setLineDash([]); cx.restore();
+
+    drawAmbulance(px,py,a.priority,a.id,isTarget);
+  });
+
+  requestAnimationFrame(drawFrame);
+}
+
+// ── BOOT ───────────────────────────────────────────────────
+requestAnimationFrame(drawFrame);
+connect();
+</script>
+</body>
+</html>

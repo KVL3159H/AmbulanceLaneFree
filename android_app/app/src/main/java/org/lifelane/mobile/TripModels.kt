@@ -16,16 +16,62 @@ enum class AppScreen {
     EMERGENCY, LIVE_GPS, DELIVER_CONFIRM, CANCEL_CONFIRM
 }
 
+data class HospitalDestination(
+    val id: String,
+    val name: String,
+    val specialty: String,
+    val cityName: String = "",                      // city this hospital belongs to (set from reverse geocode)
+    val corridorApproach: String,               // "North", "South", "East", "West", "North-East"
+    val latitude: Double,
+    val longitude: Double,
+    val address: String,
+    val distanceKm: Double,
+)
+
+/** Per-arm signal state for the 4-way junction. */
+data class SignalArms(
+    val north: String = "RED",
+    val south: String = "RED",
+    val east: String = "RED",
+    val west: String = "RED",
+) {
+    companion object {
+        /** Parse a signalStatus string like "NORTH:GREEN,SOUTH:RED,EAST:RED,WEST:RED" */
+        fun fromString(raw: String): SignalArms {
+            if (!raw.contains(":")) return SignalArms()
+            val map = raw.split(",").associate { part ->
+                val kv = part.trim().split(":")
+                (kv.getOrNull(0)?.uppercase() ?: "") to (kv.getOrNull(1)?.uppercase() ?: "RED")
+            }
+            return SignalArms(
+                north = map["NORTH"] ?: "RED",
+                south = map["SOUTH"] ?: "RED",
+                east = map["EAST"] ?: "RED",
+                west = map["WEST"] ?: "RED",
+            )
+        }
+    }
+}
+
 data class TripUiState(
     val screen: AppScreen = AppScreen.SPLASH,
     val driverId: String = "",
     val ambulanceId: String = "",
     val rememberAmbulance: Boolean = false,
     val recentHospitals: List<String> = emptyList(),
+    // City hospitals (all hospitals inside the detected/selected city via Overpass, or fallback)
+    val nearbyHospitals: List<HospitalDestination> = HospitalRepository.RAJAPALAYAM_FALLBACK,
+    val hospitalsLoading: Boolean = false,
+    val hospitalsError: String? = null,
+    val hospitalCityName: String = "Detecting location…",   // city currently shown in the hospital list
+    val hospitalSearchQuery: String = "",            // live text filter on the hospital list
     val tripId: String = "",
     val priority: PatientPriority? = null,
     val condition: PatientCondition? = null,
     val destination: String = "",
+    val selectedHospital: HospitalDestination? = null,
+    val destinationLat: Double? = null,
+    val destinationLon: Double? = null,
     val emergencyActive: Boolean = false,
     val startTime: Instant? = null,
     val latitude: Double? = null,
@@ -40,5 +86,12 @@ data class TripUiState(
     val detectedApproach: String = "Not detected",
     val requestStatus: String = "Not requested",
     val signalStatus: String = "Awaiting junction status",
+    val signalArms: SignalArms = SignalArms(),
     val message: String? = null,
+    val mapZoom: Float = 1.0f,
+    val followVehicle: Boolean = true,
 )
+
+// Keep a static DEFAULT_HOSPITALS for backward-compat with any references outside the ViewModel
+val DEFAULT_HOSPITALS get() = HospitalRepository.RAJAPALAYAM_FALLBACK
+

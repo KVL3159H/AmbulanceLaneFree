@@ -37,6 +37,11 @@ class EmergencyLocationService : Service() {
     private lateinit var priority: String
     private lateinit var condition: String
     private lateinit var destination: String
+    private var destinationLat: Double = 9.456500
+    private var destinationLon: Double = 77.553500
+    private var junctionLat: Double = JUNCTION_LAT
+    private var junctionLon: Double = JUNCTION_LON
+    private var junctionInitialized: Boolean = false
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -70,6 +75,11 @@ class EmergencyLocationService : Service() {
         priority = intent.getStringExtra(EXTRA_PRIORITY) ?: "RED"
         condition = intent.getStringExtra(EXTRA_CONDITION) ?: "OTHER"
         destination = intent.getStringExtra(EXTRA_DESTINATION) ?: ""
+        destinationLat = intent.getDoubleExtra(EXTRA_DEST_LAT, 9.456500)
+        destinationLon = intent.getDoubleExtra(EXTRA_DEST_LON, 77.553500)
+        junctionLat = intent.getDoubleExtra(EXTRA_JUNC_LAT, JUNCTION_LAT)
+        junctionLon = intent.getDoubleExtra(EXTRA_JUNC_LON, JUNCTION_LON)
+        junctionInitialized = false
         createNotificationChannel()
         val openApp = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -137,8 +147,19 @@ class EmergencyLocationService : Service() {
             TripStatusRepository.update { it.copy(gpsStatus = status, accuracyMetres = if (location.hasAccuracy()) location.accuracy else it.accuracyMetres) }
             return
         }
-        val distance = distanceMetres(location.latitude, location.longitude, JUNCTION_LAT, JUNCTION_LON)
-        val relativeBearing = bearing(JUNCTION_LAT, JUNCTION_LON, location.latitude, location.longitude)
+        if (!junctionInitialized) {
+            val distToDemo = distanceMetres(location.latitude, location.longitude, JUNCTION_LAT, JUNCTION_LON)
+            if (distToDemo <= 20_000.0) {
+                junctionLat = JUNCTION_LAT
+                junctionLon = JUNCTION_LON
+            } else {
+                junctionLat = (location.latitude + destinationLat) / 2.0
+                junctionLon = (location.longitude + destinationLon) / 2.0
+            }
+            junctionInitialized = true
+        }
+        val distance = distanceMetres(location.latitude, location.longitude, junctionLat, junctionLon)
+        val relativeBearing = bearing(junctionLat, junctionLon, location.latitude, location.longitude)
         val approach = when {
             relativeBearing >= 315 || relativeBearing < 45 -> "NORTH"
             relativeBearing < 135 -> "EAST"
@@ -221,6 +242,10 @@ class EmergencyLocationService : Service() {
         const val EXTRA_PRIORITY = "priority"
         const val EXTRA_CONDITION = "condition"
         const val EXTRA_DESTINATION = "destination"
+        const val EXTRA_DEST_LAT = "destLat"
+        const val EXTRA_DEST_LON = "destLon"
+        const val EXTRA_JUNC_LAT = "juncLat"
+        const val EXTRA_JUNC_LON = "juncLon"
         private const val CHANNEL_ID = "lifelane_emergency_location"
         private const val NOTIFICATION_ID = 1001
         private const val JUNCTION_LAT = 9.451500

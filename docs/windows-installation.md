@@ -4,18 +4,28 @@ This guide describes how to run, build, package, and deploy LifeLane on Windows 
 
 ---
 
-## 1. Quick Start (One-Click Launch)
+## 1. Quick Start (Unified Control Hub & One-Click Launch)
 
-If Python 3.10+ is already installed on your Windows machine:
+If Python 3.10+ is installed on your Windows machine:
 
-1. Double-click **`run_windows.bat`** in the project root folder.
-2. The script will automatically launch the LifeLane Windows Desktop simulator.
+1. Double-click **`run.bat`** (or **`lifelane.bat`**) in the project root to open the interactive **LifeLane Control Hub**.
+2. From the menu, you can instantly:
+   - **[1] Launch Desktop Simulator (PySide6 GUI)**
+   - **[2] Start Built-in Zero-Dependency MQTT Broker**
+   - **[3] Launch All-In-One Full Stack (Broker + Simulator)**
+   - **[4] Build Android APK**
+   - **[5] Build & Install APK to Connected Phone (ADB)**
+   - **[6] Build Standalone Windows Executable (.exe)**
+   - **[7] Run Automated PyTest Suite**
+   - **[8] Run LifeLane Doctor (System Diagnostics)**
+   - **[9] Network & MQTT IP Helper**
 
-If dependencies are not yet installed, run:
-```cmd
-scripts\install_windows.bat
-```
-This will create a Python virtual environment (`.venv`), install all requirements (PySide6, Paho MQTT, PyYAML, python-dotenv, PyInstaller), copy `.env.example` to `.env`, and prepare the application.
+You can also run direct single-purpose batch files at any time:
+- **`run_windows.bat`**: Run desktop simulator immediately.
+- **`run_broker.bat`**: Start the pure-Python MQTT broker.
+- **`scripts\build_android.bat`**: Compile and install the Android app.
+- **`scripts\build_windows_exe.bat`**: Package standalone `LifeLane.exe`.
+- **`scripts\install_windows.bat`**: Install all dependencies and set up virtual environment.
 
 ---
 
@@ -78,11 +88,19 @@ You can create a desktop shortcut to `dist\LifeLane\LifeLane.exe` or distribute 
 
 ---
 
-## 4. Setting Up Mosquitto MQTT Broker on Windows
+## 4. MQTT Broker on Windows (Built-in or Mosquitto)
 
-To connect an Android phone or test live mobile GPS packets over your local Wi-Fi network:
+LifeLane now includes a **built-in zero-dependency Pure-Python MQTT 3.1.1 broker** that works immediately without installing Mosquitto:
 
-### Step 1: Install Mosquitto
+### Option A: Built-in Pure-Python Broker (Recommended for Development)
+Simply run:
+```cmd
+run_broker.bat
+```
+or choose **Option [2]** in `run.bat`. It will automatically display your PC's Wi-Fi / LAN IP address for phone connection and handle all LifeLane telemetry.
+
+### Option B: External Eclipse Mosquitto
+If you prefer running the native Mosquitto daemon:
 You can install Eclipse Mosquitto on Windows via Windows Package Manager:
 ```cmd
 winget install EclipseFoundation.Mosquitto

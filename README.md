@@ -25,13 +25,24 @@ LifeLane is a Phase 1, software-only demonstration of a four-way traffic junctio
 
 LifeLane runs natively on Windows 10/11. See [Windows Installation & Deployment Guide](docs/windows-installation.md) for full instructions.
 
-### 1. One-click setup & launch
-- **Run immediately:** double-click `run_windows.bat` in the project root.
-- **Install dependencies:** run `scripts\install_windows.bat` (or `scripts\install_windows.ps1` in PowerShell).
+### 1. Unified Control Hub & One-Click Launch
+- **Master Interactive Hub:** double-click **`run.bat`** (or **`lifelane.bat`**) in the project root to open the LifeLane Control Hub menu.
+- **Run Desktop Simulator directly:** double-click **`run_windows.bat`**.
+- **Start Local MQTT Broker:** double-click **`run_broker.bat`** (zero dependencies, auto-detects Wi-Fi LAN IP for phone connection).
+- **Install dependencies:** run **`scripts\install_windows.bat`** (or `scripts\install_windows.ps1` in PowerShell).
+- **Check environment health:** run `python -m scripts.doctor`.
+- **Build Android APK:** run **`scripts\build_android.bat`** (compiles and auto-installs to connected phone via ADB).
 
 ### 2. Run via command line
 ```cmd
+# Unified CLI Hub
+python -m scripts.lifelane_hub
+
+# Direct desktop launch
 python -m windows_app.main
+
+# System Diagnostics Doctor
+python -m scripts.doctor
 ```
 
 ### 3. Build standalone Windows software (`LifeLane.exe`)
