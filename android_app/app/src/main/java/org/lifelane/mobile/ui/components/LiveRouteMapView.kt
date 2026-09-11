@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LocalHospital
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Navigation
@@ -84,7 +85,6 @@ import org.lifelane.mobile.ui.theme.WhatsAppShapes
 import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
 
 private const val METRES_PER_LAT_DEGREE = 111_320.0
-private const val METRES_PER_LON_DEGREE = 109_750.0 // At ~9.45 deg latitude
 private const val JUNCTION_LAT = 9.451500
 private const val JUNCTION_LON = 77.553500
 
@@ -105,9 +105,51 @@ fun LiveRouteMapView(
     darkTheme: Boolean,
     modifier: Modifier = Modifier,
     isExpandedView: Boolean = false,
+    accuracyMetres: Float? = null,
     onToggleExpand: (() -> Unit)? = null,
 ) {
-    // Zoom and pan state
+    // Toggle between real-world OpenStreetMap tile view and tactical radar HUD
+    var showRealMap by remember { mutableStateOf(true) }
+
+    // Dynamic corridor junction estimation based on location
+    val dynamicJunctionLat = when {
+        ambulanceLat != null && destinationLat != null -> (ambulanceLat + destinationLat) / 2.0
+        ambulanceLat != null -> ambulanceLat - 0.003
+        else -> JUNCTION_LAT
+    }
+    val dynamicJunctionLon = when {
+        ambulanceLon != null && destinationLon != null -> (ambulanceLon + destinationLon) / 2.0
+        ambulanceLon != null -> ambulanceLon
+        else -> JUNCTION_LON
+    }
+
+    if (showRealMap) {
+        RealTimeMapView(
+            ambulanceLat = ambulanceLat,
+            ambulanceLon = ambulanceLon,
+            headingDegrees = headingDegrees,
+            speedMps = speedMps,
+            accuracyMetres = accuracyMetres,
+            ambulanceId = ambulanceId,
+            destinationHospital = destinationHospital,
+            destinationLat = destinationLat,
+            destinationLon = destinationLon,
+            junctionLat = dynamicJunctionLat,
+            junctionLon = dynamicJunctionLon,
+            signalStatus = signalStatus,
+            detectedApproach = detectedApproach,
+            distanceMetres = distanceMetres,
+            isEmergencyActive = isEmergencyActive,
+            darkTheme = darkTheme,
+            modifier = modifier,
+            isExpandedView = isExpandedView,
+            onToggleExpand = onToggleExpand,
+            onSwitchToTactical = { showRealMap = false },
+        )
+        return
+    }
+
+    // Zoom and pan state for tactical radar canvas
     var zoomLevel by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
     var followVehicle by remember { mutableStateOf(true) }
@@ -145,11 +187,14 @@ fun LiveRouteMapView(
         label = "PathFlow",
     )
 
+    // Dynamic longitude scaling based on latitude
+    val metresPerLonDegree = METRES_PER_LAT_DEGREE * cos(Math.toRadians(dynamicJunctionLat))
+
     // Fallback coordinates
-    val effectiveAmbLat = ambulanceLat ?: (JUNCTION_LAT + 0.0035) // Start 380m North if no GPS yet
-    val effectiveAmbLon = ambulanceLon ?: JUNCTION_LON
-    val effectiveDestLat = destinationLat ?: (JUNCTION_LAT - 0.0045) // South hospital
-    val effectiveDestLon = destinationLon ?: JUNCTION_LON
+    val effectiveAmbLat = ambulanceLat ?: (dynamicJunctionLat + 0.0035)
+    val effectiveAmbLon = ambulanceLon ?: dynamicJunctionLon
+    val effectiveDestLat = destinationLat ?: (dynamicJunctionLat - 0.0045)
+    val effectiveDestLon = destinationLon ?: dynamicJunctionLon
 
     // Theme Colors
     val mapBgColor = if (darkTheme) Color(0xFF101921) else Color(0xFFE8ECEF)
@@ -186,8 +231,8 @@ fun LiveRouteMapView(
 
                 // Origin reference: Junction is at (0, 0) in metres
                 val centerOffset = if (followVehicle) {
-                    val ambNorthM = (effectiveAmbLat - JUNCTION_LAT) * METRES_PER_LAT_DEGREE
-                    val ambEastM = (effectiveAmbLon - JUNCTION_LON) * METRES_PER_LON_DEGREE
+                    val ambNorthM = (effectiveAmbLat - dynamicJunctionLat) * METRES_PER_LAT_DEGREE
+                    val ambEastM = (effectiveAmbLon - dynamicJunctionLon) * metresPerLonDegree
                     Offset(
                         canvasW / 2f - (ambEastM.toFloat() * pixelsPerMetre) + panOffset.x,
                         canvasH / 2f + (ambNorthM.toFloat() * pixelsPerMetre) + panOffset.y,
@@ -197,15 +242,15 @@ fun LiveRouteMapView(
                 }
 
                 fun toCanvasPos(lat: Double, lon: Double): Offset {
-                    val northM = (lat - JUNCTION_LAT) * METRES_PER_LAT_DEGREE
-                    val eastM = (lon - JUNCTION_LON) * METRES_PER_LON_DEGREE
+                    val northM = (lat - dynamicJunctionLat) * METRES_PER_LAT_DEGREE
+                    val eastM = (lon - dynamicJunctionLon) * metresPerLonDegree
                     return Offset(
                         centerOffset.x + (eastM.toFloat() * pixelsPerMetre),
                         centerOffset.y - (northM.toFloat() * pixelsPerMetre),
                     )
                 }
 
-                val junctionPos = toCanvasPos(JUNCTION_LAT, JUNCTION_LON)
+                val junctionPos = toCanvasPos(dynamicJunctionLat, dynamicJunctionLon)
                 val ambulancePos = toCanvasPos(effectiveAmbLat, effectiveAmbLon)
                 val destPos = toCanvasPos(effectiveDestLat, effectiveDestLon)
 
@@ -268,6 +313,12 @@ fun LiveRouteMapView(
                     .padding(end = 12.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                MapControlButton(
+                    icon = Icons.Outlined.Layers,
+                    contentDescription = "Switch to Real Street Map",
+                    darkTheme = darkTheme,
+                    onClick = { showRealMap = true },
+                )
                 if (onToggleExpand != null) {
                     MapControlButton(
                         icon = if (isExpandedView) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
@@ -801,7 +852,7 @@ private fun DrawScope.drawAmbulanceMarker(
 // -------------------------------------------------------------
 
 @Composable
-private fun FloatingNavigationCard(
+internal fun FloatingNavigationCard(
     destination: String,
     distanceMetres: Double?,
     speedMps: Float,
@@ -883,7 +934,7 @@ private fun FloatingNavigationCard(
 }
 
 @Composable
-private fun MapControlButton(
+internal fun MapControlButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     darkTheme: Boolean,

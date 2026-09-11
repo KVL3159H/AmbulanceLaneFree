@@ -187,7 +187,11 @@ def check_adb_and_devices(sdk_path: Optional[Path]):
     print(f" {check_mark(True)} ADB Tool: {adb_path}")
     code, out = run_command([adb_path, "devices", "-l"])
     if code == 0:
-        lines = [l for l in out.splitlines()[1:] if l.strip()]
+        lines = [
+            l.strip()
+            for l in out.splitlines()
+            if l.strip() and not l.strip().startswith("*") and not l.strip().startswith("List of")
+        ]
         if lines:
             print(f" {GREEN}[FOUND]{RESET} Connected Devices/Emulators ({len(lines)}):")
             for line in lines:

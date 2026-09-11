@@ -71,6 +71,13 @@ def action_run_desktop():
     subprocess.run(cmd, cwd=PROJECT_ROOT)
 
 
+def action_run_web():
+    print(f"\n{BOLD}{CYAN}>>> Launching LifeLane Web Application (http://localhost:5000)...{RESET}\n")
+    py = get_python_exe()
+    cmd = [py, "-m", "web_app.server"]
+    subprocess.run(cmd, cwd=PROJECT_ROOT)
+
+
 def action_run_broker():
     print(f"\n{BOLD}{CYAN}>>> Starting LifeLane MQTT Broker...{RESET}\n")
     py = get_python_exe()

@@ -38,6 +38,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -47,6 +49,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -488,117 +491,261 @@ private fun ConditionScreen(state: TripUiState, vm: TripViewModel, darkTheme: Bo
 
 @Composable
 private fun DestinationScreen(state: TripUiState, vm: TripViewModel, darkTheme: Boolean) {
-    val selected = state.selectedHospital ?: DEFAULT_HOSPITALS.find { it.name.equals(state.destination, ignoreCase = true) }
+    val selected = state.selectedHospital
+        ?: state.nearbyHospitals.find { it.name.equals(state.destination, ignoreCase = true) }
+
+    // Filter the live hospital list by search query (name, specialty, or address)
+    val query = state.hospitalSearchQuery.trim()
+    val displayedHospitals = remember(state.nearbyHospitals, query) {
+        if (query.isBlank()) state.nearbyHospitals
+        else state.nearbyHospitals.filter { h ->
+            h.name.contains(query, ignoreCase = true) ||
+                h.specialty.contains(query, ignoreCase = true) ||
+                h.address.contains(query, ignoreCase = true)
+        }
+    }
 
     ScreenContainer {
         SetupProgress(2, "Destination")
-        ScreenHeading("Destination Medical Center", "Select receiving hospital facility to calculate route & corridor preemption.")
+        ScreenHeading(
+            "Destination Medical Center",
+            "Select a receiving hospital in ${state.hospitalCityName} for route & corridor preemption.",
+        )
         MessageBanner(state.message)
 
-        Text("Select Hospital Facility", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        // ── City header row: city name + count badge + refresh button ──────────────────
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "Hospitals in ${state.hospitalCityName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (!state.hospitalsLoading) {
+                    Text(
+                        if (query.isBlank())
+                            "${state.nearbyHospitals.size} facilities found"
+                        else
+                            "${displayedHospitals.size} of ${state.nearbyHospitals.size} match \"$query\"",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            IconButton(
+                onClick = vm::refreshHospitals,
+                enabled = !state.hospitalsLoading,
+            ) {
+                Icon(
+                    Icons.Outlined.Refresh,
+                    contentDescription = "Refresh hospital list",
+                    tint = if (state.hospitalsLoading)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    else WhatsAppVibrantGreen,
+                )
+            }
+        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            DEFAULT_HOSPITALS.forEach { hospital ->
-                val isSelected = selected?.id == hospital.id || state.destination.equals(hospital.name, ignoreCase = true)
-                val cardBg = if (isSelected) WhatsAppTokens.outgoingBubbleColor(darkTheme) else MaterialTheme.colorScheme.surface
-                val borderStroke = if (isSelected) BorderStroke(2.dp, WhatsAppVibrantGreen) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        // ── Offline / error banner ─────────────────────────────────────────────────────
+        state.hospitalsError?.let { errorMsg ->
+            WarningBanner(
+                title = "Offline Data",
+                detail = errorMsg,
+                onRetry = vm::refreshHospitals,
+            )
+        }
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { vm.selectHospital(hospital) },
-                    shape = WhatsAppShapes.card,
-                    colors = CardDefaults.cardColors(containerColor = cardBg),
-                    border = borderStroke,
-                ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(
-                            Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(if (isSelected) WhatsAppVibrantGreen.copy(alpha = 0.20f) else MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center,
+        // ── Search bar ────────────────────────────────────────────────────────────────
+        OutlinedTextField(
+            value = state.hospitalSearchQuery,
+            onValueChange = vm::setHospitalSearchQuery,
+            label = { Text("Search hospitals in ${state.hospitalCityName}") },
+            leadingIcon = { Icon(Icons.Outlined.Search, null, tint = WhatsAppVibrantGreen) },
+            trailingIcon = {
+                if (state.hospitalSearchQuery.isNotEmpty()) {
+                    IconButton(onClick = { vm.setHospitalSearchQuery("") }) {
+                        Icon(Icons.Outlined.CheckCircle, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            singleLine = true,
+            shape = WhatsAppShapes.card,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = WhatsAppVibrantGreen,
+                focusedLabelColor  = WhatsAppVibrantGreen,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        // ── Loading indicator ─────────────────────────────────────────────────────────
+        if (state.hospitalsLoading) {
+            LoadingState("Fetching all hospitals in ${state.hospitalCityName}…")
+        }
+
+        // ── Hospital list ─────────────────────────────────────────────────────────────
+        if (!state.hospitalsLoading) {
+            if (displayedHospitals.isEmpty()) {
+                EmptyState(
+                    title = if (query.isBlank()) "No hospitals found in ${state.hospitalCityName}"
+                            else "No results for \"$query\"",
+                    detail = if (query.isBlank()) "Tap the refresh button to retry the search."
+                             else "Try a different name, specialty, or address.",
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    displayedHospitals.forEach { hospital ->
+                        val isSelected = selected?.id == hospital.id ||
+                            state.destination.equals(hospital.name, ignoreCase = true)
+                        val cardBg = if (isSelected)
+                            WhatsAppTokens.outgoingBubbleColor(darkTheme)
+                        else MaterialTheme.colorScheme.surface
+                        val borderStroke = if (isSelected)
+                            BorderStroke(2.dp, WhatsAppVibrantGreen)
+                        else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.selectHospital(hospital) },
+                            shape = WhatsAppShapes.card,
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            border = borderStroke,
                         ) {
-                            Icon(
-                                Icons.Outlined.LocalHospital,
-                                contentDescription = null,
-                                tint = if (isSelected) WhatsAppVibrantGreen else EmergencyRed,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
+                            Row(
+                                Modifier.fillMaxWidth().padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                // Hospital icon circle
+                                Box(
+                                    Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) WhatsAppVibrantGreen.copy(alpha = 0.20f)
+                                            else MaterialTheme.colorScheme.surfaceVariant
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.LocalHospital,
+                                        contentDescription = null,
+                                        tint = if (isSelected) WhatsAppVibrantGreen else EmergencyRed,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                }
 
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(hospital.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                if (isSelected) WhatsAppCheckMarks(CheckMarkState.DOUBLE_BLUE)
+                                // Name + specialty + address
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        Text(
+                                            hospital.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        if (isSelected) WhatsAppCheckMarks(CheckMarkState.DOUBLE_BLUE)
+                                    }
+                                    Text(
+                                        hospital.specialty,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = WhatsAppVibrantGreen,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                    Text(
+                                        "${hospital.address} · ${hospital.corridorApproach} Corridor",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+
+                                // Distance badge
+                                Surface(
+                                    shape = WhatsAppShapes.pillBadge,
+                                    color = if (isSelected)
+                                        WhatsAppVibrantGreen.copy(alpha = 0.14f)
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                ) {
+                                    Text(
+                                        if (hospital.distanceKm < 1.0)
+                                            "%.0f m".format(hospital.distanceKm * 1000)
+                                        else
+                                            "%.1f km".format(hospital.distanceKm),
+                                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isSelected) WhatsAppVibrantGreen
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
-                            Text(hospital.specialty, style = MaterialTheme.typography.bodySmall, color = WhatsAppVibrantGreen, fontWeight = FontWeight.Medium)
-                            Text("${hospital.address} · ${hospital.corridorApproach} Corridor", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-
-                        Surface(
-                            shape = WhatsAppShapes.pillBadge,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                        ) {
-                            Text(
-                                "%.2f km".format(hospital.distanceKm),
-                                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }
             }
         }
 
-        // Custom Destination Input
-        Text("Or Enter Custom Destination", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        // ── Custom destination text input ─────────────────────────────────────────────
+        Text(
+            "Or Enter Custom Destination",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
         OutlinedTextField(
             value = state.destination,
             onValueChange = vm::setDestination,
             label = { Text("Custom Hospital or Clinic Name") },
             leadingIcon = { Icon(Icons.Outlined.Place, null, tint = WhatsAppVibrantGreen) },
-            supportingText = { Text("Junction distance & approach calculation will initialize upon route activation.") },
+            supportingText = {
+                Text("Junction distance & approach calculation will initialize upon route activation.")
+            },
             singleLine = true,
             shape = WhatsAppShapes.card,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = WhatsAppVibrantGreen,
-                focusedLabelColor = WhatsAppVibrantGreen,
+                focusedLabelColor  = WhatsAppVibrantGreen,
             ),
             modifier = Modifier.fillMaxWidth(),
         )
 
-        // Route Map Preview
+        // ── Route map preview (shown once a hospital is selected) ─────────────────────
         if (state.destination.isNotBlank()) {
-            Text("Route Corridor Preview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Route Corridor Preview",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
             LiveRouteMapView(
-                ambulanceLat = state.latitude,
-                ambulanceLon = state.longitude,
-                headingDegrees = state.headingDegrees,
-                speedMps = state.speedMps,
-                ambulanceId = state.ambulanceId,
+                ambulanceLat        = state.latitude,
+                ambulanceLon        = state.longitude,
+                headingDegrees      = state.headingDegrees,
+                speedMps            = state.speedMps,
+                ambulanceId         = state.ambulanceId,
                 destinationHospital = state.destination,
-                destinationLat = state.destinationLat ?: selected?.latitude,
-                destinationLon = state.destinationLon ?: selected?.longitude,
-                signalStatus = "PREVIEW",
-                detectedApproach = selected?.corridorApproach ?: "North",
-                distanceMetres = 550.0,
-                isEmergencyActive = false,
-                darkTheme = darkTheme,
-                accuracyMetres = state.accuracyMetres,
-                modifier = Modifier.height(200.dp),
+                destinationLat      = state.destinationLat ?: selected?.latitude,
+                destinationLon      = state.destinationLon ?: selected?.longitude,
+                signalStatus        = "PREVIEW",
+                detectedApproach    = selected?.corridorApproach ?: "North",
+                distanceMetres      = 550.0,
+                isEmergencyActive   = false,
+                darkTheme           = darkTheme,
+                accuracyMetres      = state.accuracyMetres,
+                modifier            = Modifier.height(200.dp),
             )
         }
 
-        PrimaryActionButton("Review Route & Preemption", vm::reviewTrip, enabled = state.destination.isNotBlank())
+        PrimaryActionButton(
+            "Review Route & Preemption",
+            vm::reviewTrip,
+            enabled = state.destination.isNotBlank(),
+        )
         OutlinedButton(
             onClick = { vm.backTo(AppScreen.CONDITION) },
             modifier = Modifier.fillMaxWidth().height(50.dp),

@@ -20,7 +20,8 @@ data class HospitalDestination(
     val id: String,
     val name: String,
     val specialty: String,
-    val corridorApproach: String, // "North", "South", "East", "West", "North-East"
+    val cityName: String = "",                      // city this hospital belongs to (set from reverse geocode)
+    val corridorApproach: String,               // "North", "South", "East", "West", "North-East"
     val latitude: Double,
     val longitude: Double,
     val address: String,
@@ -58,10 +59,12 @@ data class TripUiState(
     val ambulanceId: String = "",
     val rememberAmbulance: Boolean = false,
     val recentHospitals: List<String> = emptyList(),
-    // Nearby hospitals (GPS-based from Overpass API, or fallback)
+    // City hospitals (all hospitals inside the detected/selected city via Overpass, or fallback)
     val nearbyHospitals: List<HospitalDestination> = HospitalRepository.RAJAPALAYAM_FALLBACK,
     val hospitalsLoading: Boolean = false,
     val hospitalsError: String? = null,
+    val hospitalCityName: String = "Detecting location…",   // city currently shown in the hospital list
+    val hospitalSearchQuery: String = "",            // live text filter on the hospital list
     val tripId: String = "",
     val priority: PatientPriority? = null,
     val condition: PatientCondition? = null,
