@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.location.LocationServices
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -122,14 +123,40 @@ fun LifeLaneApp(vm: TripViewModel = viewModel()) {
     var darkTheme by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-        if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true) vm.startTrip()
-        else vm.reportPermissionDenied()
+        val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            try {
+                LocationServices.getFusedLocationProviderClient(context).lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) vm.updatePreTripLocation(loc.latitude, loc.longitude, loc.accuracy)
+                }
+            } catch (e: SecurityException) { /* no-op */ }
+            if (state.screen == AppScreen.CONFIRM) vm.startTrip()
+        } else {
+            if (state.screen == AppScreen.CONFIRM) vm.reportPermissionDenied()
+        }
     }
     val requestLocationAndStart = {
         val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (fine || coarse) vm.startTrip()
         else {
+            val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
+            permissionLauncher.launch(permissions.toTypedArray())
+        }
+    }
+
+    // Automatically check and acquire location fix early so real-time map and nearby hospitals load immediately
+    LaunchedEffect(state.screen) {
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (fine || coarse) {
+            try {
+                LocationServices.getFusedLocationProviderClient(context).lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) vm.updatePreTripLocation(loc.latitude, loc.longitude, loc.accuracy)
+                }
+            } catch (e: SecurityException) { /* no-op */ }
+        } else if (state.screen == AppScreen.AMBULANCE || state.screen == AppScreen.DESTINATION) {
             val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             if (Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
             permissionLauncher.launch(permissions.toTypedArray())
@@ -342,7 +369,7 @@ private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel, darkTheme: Bo
         ScreenHeading("Select Ambulance", "Choose an authorized vehicle from your connected fleet.")
         MessageBanner(state.message)
         WhatsAppSecurityBanner(
-            "Fleet authentication active. Selected vehicle receives encrypted traffic-light preemption authorization.",
+            text = "Fleet authentication active. Selected vehicle receives encrypted traffic-light preemption authorization.",
             darkTheme = darkTheme,
         )
         Text("Active Vehicles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -553,10 +580,10 @@ private fun DestinationScreen(state: TripUiState, vm: TripViewModel, darkTheme: 
         if (state.destination.isNotBlank()) {
             Text("Route Corridor Preview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             LiveRouteMapView(
-                ambulanceLat = null,
-                ambulanceLon = null,
-                headingDegrees = 0f,
-                speedMps = 0f,
+                ambulanceLat = state.latitude,
+                ambulanceLon = state.longitude,
+                headingDegrees = state.headingDegrees,
+                speedMps = state.speedMps,
                 ambulanceId = state.ambulanceId,
                 destinationHospital = state.destination,
                 destinationLat = state.destinationLat ?: selected?.latitude,
@@ -566,6 +593,7 @@ private fun DestinationScreen(state: TripUiState, vm: TripViewModel, darkTheme: 
                 distanceMetres = 550.0,
                 isEmergencyActive = false,
                 darkTheme = darkTheme,
+                accuracyMetres = state.accuracyMetres,
                 modifier = Modifier.height(200.dp),
             )
         }
@@ -605,6 +633,7 @@ private fun TripConfirmationScreen(state: TripUiState, vm: TripViewModel, darkTh
             distanceMetres = state.distanceMetres,
             isEmergencyActive = false,
             darkTheme = darkTheme,
+            accuracyMetres = state.accuracyMetres,
             modifier = Modifier.height(240.dp),
         )
 
@@ -622,7 +651,7 @@ private fun TripConfirmationScreen(state: TripUiState, vm: TripViewModel, darkTh
         )
 
         WhatsAppSecurityBanner(
-            "Driver confirmation required: Starting this route engages live GPS tracking and broadcasts authenticated traffic signal preemption requests.",
+            text = "Driver confirmation required: Starting this route engages live GPS tracking and broadcasts authenticated traffic signal preemption requests.",
             darkTheme = darkTheme,
         )
 
@@ -693,6 +722,7 @@ private fun ActiveEmergencyScreen(state: TripUiState, vm: TripViewModel, darkThe
             distanceMetres = state.distanceMetres,
             isEmergencyActive = state.emergencyActive,
             darkTheme = darkTheme,
+            accuracyMetres = state.accuracyMetres,
             modifier = Modifier.height(320.dp),
             isExpandedView = false,
             onToggleExpand = vm::showLiveGps,
@@ -805,6 +835,7 @@ private fun LiveGpsScreen(state: TripUiState, vm: TripViewModel, darkTheme: Bool
             distanceMetres = state.distanceMetres,
             isEmergencyActive = state.emergencyActive,
             darkTheme = darkTheme,
+            accuracyMetres = state.accuracyMetres,
             modifier = Modifier.height(420.dp),
             isExpandedView = true,
             onToggleExpand = vm::showEmergency,
