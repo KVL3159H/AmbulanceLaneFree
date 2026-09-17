@@ -11,6 +11,6 @@ if exist ".venv\Scripts\python.exe" (
     set "PY_CMD=.venv\Scripts\python.exe"
 )
 
-%PY_CMD% -m scripts.run_broker
+"%PY_CMD%" -m scripts.run_broker %*
 pause
 endlocal

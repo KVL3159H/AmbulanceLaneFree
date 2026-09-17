@@ -19,8 +19,8 @@ android {
         applicationId = "org.lifelane.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.2"
         buildConfigField("String", "MQTT_HOST", "\"${localProperties.getProperty("lifelane.mqtt.host", "10.0.2.2")}\"")
         buildConfigField("int", "MQTT_PORT", localProperties.getProperty("lifelane.mqtt.port", "1883"))
         buildConfigField("String", "MQTT_USERNAME", "\"${localProperties.getProperty("lifelane.mqtt.username", "")}\"")

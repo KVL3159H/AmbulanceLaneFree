@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 from collections import deque
 
 from PySide6.QtCore import QPointF, QRectF, Qt
@@ -10,8 +11,9 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygon
 from PySide6.QtWidgets import QFrame, QGraphicsPathItem, QGraphicsScene, QGraphicsView
 
 from ..core.models import Approach, GPSAssessment
-from ..core.signal_states import SignalColour
+from ..core.signal_states import PreemptionState, SignalColour
 from .ambulance_item import AmbulanceItem
+from .civilian_car_item import CAR_PALETTE, CivilianCarItem
 from .theme import Color, qt_colour
 from .traffic_signal_item import TrafficSignalItem
 
@@ -33,8 +35,11 @@ class JunctionScene(QGraphicsScene):
         self.signals: dict[Approach, TrafficSignalItem] = {}
         self.ambulances: dict[str, AmbulanceItem] = {}
         self.trails: dict[str, tuple[QGraphicsPathItem, deque[QPointF]]] = {}
+        self.civilian_cars: list[CivilianCarItem] = []
+        self.priority_corridor: QGraphicsPathItem | None = None
         self.setBackgroundBrush(QColor(Color.ELEVATED))
         self._draw_junction()
+        self._init_civilian_traffic()
 
     def _draw_junction(self) -> None:
         self.addRect(self.sceneRect(), QPen(Qt.PenStyle.NoPen), QBrush(QColor(Color.ELEVATED)))
@@ -144,6 +149,114 @@ class JunctionScene(QGraphicsScene):
     def hide_ambulance(self, trip_id: str) -> None:
         if trip_id in self.ambulances: self.ambulances[trip_id].setVisible(False)
         if trip_id in self.trails: self.trails[trip_id][0].setVisible(False)
+
+    def _init_civilian_traffic(self) -> None:
+        for car in self.civilian_cars:
+            self.removeItem(car)
+        self.civilian_cars.clear()
+        car_idx = 1
+        # Stagger 2-3 cars per approach
+        for approach in Approach:
+            for start_d in (40.0, 160.0):
+                car = CivilianCarItem(
+                    f"CIV-{car_idx}",
+                    approach,
+                    start_d,
+                    speed_pps=75.0 + random.uniform(-10.0, 15.0),
+                )
+                self.addItem(car)
+                self.civilian_cars.append(car)
+                car_idx += 1
+
+    def update_traffic(
+        self,
+        dt: float,
+        signals: dict[Approach, SignalColour],
+        preemption_state: PreemptionState,
+        target_approach: Approach | None,
+    ) -> None:
+        preemption_active = preemption_state not in (PreemptionState.NORMAL, PreemptionState.FAIL_SAFE)
+
+        # Group cars by approach
+        by_side: dict[Approach, list[CivilianCarItem]] = {app: [] for app in Approach}
+        for car in self.civilian_cars:
+            by_side[car.side].append(car)
+
+        lane_offset = 56.0
+
+        for approach, cars in by_side.items():
+            cars.sort(key=lambda c: c.pos_along_road, reverse=True)
+            is_ns = approach in (Approach.NORTH, Approach.SOUTH)
+            stop_dist = 241.0 if is_ns else 566.0
+            exit_dist = 489.0 if is_ns else 814.0
+            total_dist = 750.0 if is_ns else 1400.0
+
+            for i, car in enumerate(cars):
+                car_ahead_dist = (cars[i - 1].pos_along_road - car.pos_along_road) if i > 0 else None
+                sig = signals.get(approach, SignalColour.RED)
+                car.update_behavior(
+                    dt,
+                    sig,
+                    preemption_active,
+                    target_approach,
+                    car_ahead_dist,
+                    stop_dist,
+                    exit_dist,
+                )
+
+                # Wrap around when leaving screen
+                if car.pos_along_road > total_dist:
+                    min_pos = min((c.pos_along_road for c in cars if c != car), default=120.0)
+                    car.pos_along_road = min(-40.0, min_pos - 130.0)
+                    car.paint_color = random.choice(CAR_PALETTE)
+                    car.curr_speed = car.speed_pps
+
+                # Map path coordinate to 2D scene space
+                if approach == Approach.NORTH:
+                    px = (self.CX - lane_offset) - car.yield_offset
+                    py = -40.0 + car.pos_along_road
+                    rot = 90.0
+                elif approach == Approach.SOUTH:
+                    px = (self.CX + lane_offset) + car.yield_offset
+                    py = 690.0 - car.pos_along_road
+                    rot = -90.0
+                elif approach == Approach.EAST:
+                    px = 1340.0 - car.pos_along_road
+                    py = (self.CY - lane_offset) - car.yield_offset
+                    rot = 180.0
+                else:  # WEST
+                    px = -40.0 + car.pos_along_road
+                    py = (self.CY + lane_offset) + car.yield_offset
+                    rot = 0.0
+
+                car.setPos(px, py)
+                car.setRotation(rot)
+
+        # Emergency ambulance priority corridor ("Ambulance Lane Free")
+        if preemption_active and target_approach:
+            if self.priority_corridor is None:
+                self.priority_corridor = QGraphicsPathItem()
+                pen = QPen(QColor(Color.PRIMARY), 3, Qt.PenStyle.DashLine)
+                pen.setDashPattern([14, 8])
+                self.priority_corridor.setPen(pen)
+                self.priority_corridor.setBrush(QBrush(qt_colour(Color.PRIMARY, 28)))
+                self.priority_corridor.setZValue(4)
+                self.addItem(self.priority_corridor)
+
+            path = QPainterPath()
+            if target_approach == Approach.NORTH:
+                path.addRect(self.CX - 38, 0, 76, self.CY + self.ROAD_HALF)
+            elif target_approach == Approach.SOUTH:
+                path.addRect(self.CX - 38, self.CY - self.ROAD_HALF, 76, self.HEIGHT - (self.CY - self.ROAD_HALF))
+            elif target_approach == Approach.EAST:
+                path.addRect(self.CX - self.ROAD_HALF, self.CY - 38, self.WIDTH - (self.CX - self.ROAD_HALF), 76)
+            elif target_approach == Approach.WEST:
+                path.addRect(0, self.CY - 38, self.CX + self.ROAD_HALF, 76)
+            self.priority_corridor.setPath(path)
+            self.priority_corridor.setVisible(True)
+        else:
+            if self.priority_corridor:
+                self.priority_corridor.setVisible(False)
 
     def clear_ambulances(self) -> None:
         for item in self.ambulances.values(): self.removeItem(item)

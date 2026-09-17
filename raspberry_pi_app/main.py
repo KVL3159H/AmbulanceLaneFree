@@ -1,8 +1,14 @@
-"""LifeLane desktop application entry point."""
+"""LifeLane desktop and embedded application entry point.
+
+Provides native platform integration including Windows AppUserModelID for taskbar
+icon grouping, high-DPI handling, PyInstaller frozen binary support, multi-path
+asset and configuration resolution, rotating file logs, and window icon setup.
+"""
 
 from __future__ import annotations
 
 import argparse
+import ctypes
 import logging
 import os
 import sys
@@ -11,36 +17,88 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+APP_USER_MODEL_ID = "LifeLane.Simulator.TrafficPreemption.1.2"
 
-def parse_args() -> argparse.Namespace:
-    project_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="LifeLane native junction simulator")
-    parser.add_argument("--config", type=Path, default=project_root / "config" / "junction.yaml")
-    parser.add_argument("--database", type=Path, default=project_root / "data" / "lifelane.db")
-    parser.add_argument("--headless-smoke-test", action="store_true")
-    parser.add_argument("--screenshot", type=Path)
-    parser.add_argument("--window-size", choices=["1440x900", "1100x700"], default="1440x900")
-    parser.add_argument("--fullscreen-smoke", action="store_true")
+
+def get_base_directories() -> tuple[Path, Path]:
+    """Return (bundle_dir, working_dir).
+
+    bundle_dir: where read-only assets (config, icons) reside (supports PyInstaller sys._MEIPASS).
+    working_dir: where mutable data (logs, database, .env) reside.
+    """
+    if getattr(sys, "frozen", False):
+        bundle_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        working_dir = Path(sys.executable).parent
+    else:
+        bundle_dir = Path(__file__).resolve().parents[1]
+        working_dir = bundle_dir
+    return bundle_dir, working_dir
+
+
+def parse_args(bundle_dir: Path, working_dir: Path) -> argparse.Namespace:
+    candidates = [
+        working_dir / "config" / "junction.yaml",
+        bundle_dir / "config" / "junction.yaml",
+        bundle_dir / "_internal" / "config" / "junction.yaml",
+        Path.cwd() / "config" / "junction.yaml",
+    ]
+    default_config = next((p for p in candidates if p.exists()), candidates[0])
+    default_db = working_dir / "data" / "lifelane.db"
+
+    parser = argparse.ArgumentParser(description="LifeLane Native Junction Simulator & Controller")
+    parser.add_argument("--config", type=Path, default=default_config, help="Path to junction YAML config")
+    parser.add_argument("--database", type=Path, default=default_db, help="Path to SQLite database")
+    parser.add_argument("--headless-smoke-test", action="store_true", help="Run automated offscreen smoke test")
+    parser.add_argument("--screenshot", type=Path, help="Save screenshot when smoke test completes")
+    parser.add_argument("--window-size", choices=["1440x900", "1100x700"], default="1440x900", help="Smoke-test viewport")
+    parser.add_argument("--fullscreen-smoke", action="store_true", help="Exercise full-screen mode during the smoke test")
     return parser.parse_args()
 
 
-def configure_logging(project_root: Path) -> None:
-    log_directory = project_root / "logs"
+def configure_logging(log_root: Path) -> None:
+    log_directory = log_root / "logs"
     log_directory.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
-        log_directory / "lifelane.log", maxBytes=1_000_000, backupCount=5, encoding="utf-8"
+        log_directory / "lifelane.log",
+        maxBytes=1_000_000,
+        backupCount=5,
+        encoding="utf-8",
     )
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[handler, logging.StreamHandler()])
+    handlers: list[logging.Handler] = [handler]
+    if sys.stdout is not None:
+        handlers.append(logging.StreamHandler(sys.stdout))
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
+
+
+def set_windows_app_id() -> None:
+    """Set explicit Windows AppUserModelID so the taskbar displays the custom icon."""
+    try:
+        if sys.platform == "win32":
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception as err:
+        logging.getLogger("lifelane.desktop").debug("Could not set AppUserModelID: %s", err)
 
 
 def main() -> int:
-    args = parse_args()
-    project_root = Path(__file__).resolve().parents[1]
-    load_dotenv(project_root / ".env")
+    bundle_dir, working_dir = get_base_directories()
+    args = parse_args(bundle_dir, working_dir)
+
+    # Load environment variables
+    env_path = working_dir / ".env"
+    if not env_path.exists():
+        env_path = bundle_dir / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+
     if args.headless_smoke_test:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    set_windows_app_id()
+    configure_logging(working_dir)
+
     from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
     from raspberry_pi_app.core.config import load_config
@@ -48,17 +106,46 @@ def main() -> int:
     from raspberry_pi_app.database.repository import Repository
     from raspberry_pi_app.ui.main_window import MainWindow
 
-    configure_logging(project_root)
     config = load_config(args.config)
     connection = connect_database(args.database)
     repository = Repository(connection, str(config.junction["id"]))
+
     app = QApplication(sys.argv[:1])
     app.setApplicationName("LifeLane")
+    app.setOrganizationName("LifeLane")
+    if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")
+
+    # Set Window and Application Icon
+    icon_paths = [
+        bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "app-icon.svg",
+        bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.ico",
+        bundle_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.png",
+        working_dir / "raspberry_pi_app" / "resources" / "icons" / "lifelane.ico",
+        working_dir / "raspberry_pi_app" / "resources" / "icons" / "app-icon.svg",
+    ]
+    for p in icon_paths:
+        if p.exists():
+            app_icon = QIcon(str(p))
+            app.setWindowIcon(app_icon)
+            break
+
     window = MainWindow(config, repository)
     if args.headless_smoke_test:
         width, height = (int(part) for part in args.window_size.split("x"))
         window.resize(width, height)
-    window.show()
+
+    # Ensure window icon is explicitly set on the main window instance
+    for p in icon_paths:
+        if p.exists():
+            window.setWindowIcon(QIcon(str(p)))
+            break
+
+    if not args.headless_smoke_test:
+        window.showMaximized()
+    else:
+        window.show()
+
     if args.headless_smoke_test:
         from raspberry_pi_app.core.models import Approach
 
@@ -78,6 +165,7 @@ def main() -> int:
             app.quit()
 
         QTimer.singleShot(2400, finish_smoke_test)
+
     return app.exec()
 
 

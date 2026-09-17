@@ -44,14 +44,16 @@ hiddenimports = [
     "raspberry_pi_app.ui.junction_scene",
     "raspberry_pi_app.ui.traffic_signal_item",
     "raspberry_pi_app.ui.ambulance_item",
+    "raspberry_pi_app.ui.civilian_car_item",
     "raspberry_pi_app.ui.event_log_panel",
     "raspberry_pi_app.ui.information_panel",
     "raspberry_pi_app.ui.priority_queue_panel",
+    "raspberry_pi_app.main",
     "windows_app",
 ]
 
 a = Analysis(
-    ["windows_app/main.py"],
+    ["raspberry_pi_app/main.py"],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,

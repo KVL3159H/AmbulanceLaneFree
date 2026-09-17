@@ -161,8 +161,8 @@ fun WhatsAppCheckMarks(state: CheckMarkState, modifier: Modifier = Modifier) {
 
 @Composable
 fun WhatsAppSecurityBanner(
-    text: String = "Messages and emergency telemetry are end-to-end encrypted. No third party can alter junction preemption.",
     modifier: Modifier = Modifier,
+    text: String = "Messages and emergency telemetry are end-to-end encrypted. No third party can alter junction preemption.",
     darkTheme: Boolean = false,
 ) {
     val bg = WhatsAppTokens.securityCardBackground(darkTheme)
