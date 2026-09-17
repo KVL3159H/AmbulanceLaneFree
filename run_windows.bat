@@ -9,7 +9,7 @@ echo ========================================================
 REM Check if virtual environment exists
 if exist ".venv\Scripts\python.exe" (
     echo [INFO] Using virtual environment (.venv)...
-    ".venv\Scripts\python.exe" -m windows_app.main %*
+    ".venv\Scripts\python.exe" -m raspberry_pi_app.main %*
     goto :end
 )
 
@@ -17,7 +17,7 @@ REM Fallback to system python
 where python >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     echo [INFO] Using system Python...
-    python -m windows_app.main %*
+    python -m raspberry_pi_app.main %*
     goto :end
 )
 
