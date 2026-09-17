@@ -103,7 +103,7 @@ def main() -> int:
     from raspberry_pi_app.core.config import load_config
     from raspberry_pi_app.database.connection import connect_database
     from raspberry_pi_app.database.repository import Repository
-    from raspberry_pi_app.ui.main_window import MainWindow
+    from windows_app.ui.main_window import MainWindow
 
     config = load_config(args.config)
     connection = connect_database(args.database)
