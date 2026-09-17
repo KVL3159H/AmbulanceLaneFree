@@ -1,17 +1,101 @@
-.venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.env
-*.db
-logs/
+# ==============================================================================
+# LifeLane .gitignore
+# ==============================================================================
+
+# --- Android & Mobile Binaries & Build Artifacts ---
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+.gradle/
 android_app/.gradle/
 android_app/.kotlin/
 android_app/local.properties
 android_app/app/build/
 android_app/build/
-.idea/
-*.iml
-local.properties
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+output-metadata.json
+output.json
+
+# Android Signing & Keystores (Security)
+*.keystore
+*.jks
+
+# --- Python & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
 build/
 dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Testing & Coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# --- Windows & PyInstaller Executables ---
+*.exe
+*.dll
+*.manifest
+
+# --- Environment Variables & Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Databases & Logs ---
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+
+# --- IDE & Editor Artifacts ---
+.idea/
+*.iml
+*.iws
+*.ipr
+*.suo
+*.user
+*.userosv
+*.sln.docstates
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --- Operating System Files ---
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
