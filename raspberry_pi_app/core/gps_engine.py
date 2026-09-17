@@ -157,8 +157,7 @@ class GPSEngine:
         ):
             return "GPS accuracy is too poor"
         age = (now - packet.timestamp).total_seconds()
-        # Allow up to 60 seconds age to accommodate clock skew on mobile devices, and 10s future drift
-        max_age = max(60.0, float(detection.get("maximum_packet_age_seconds", 5.0)))
+        max_age = float(detection.get("maximum_packet_age_seconds", 5.0))
         if age > max_age or age < -10.0:
             return "GPS packet is stale or has an invalid future timestamp"
         if not packet.emergency_active:

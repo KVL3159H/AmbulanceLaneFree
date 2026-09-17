@@ -376,7 +376,10 @@ class MainWindow(QMainWindow):
             self.mqtt.publish_status({"online": True, "preemptionState": self.coordinator.controller.state.value,
                 "signalState": ",".join(f"{side.value}:{colour.value}" for side, colour in self.coordinator.controller.signals.items()),
                 "selectedAmbulance": selected.ambulance_id if selected else "", "requestStatus": selected.status.value if selected else "NONE"})
-        self.scene.update_signals(self.coordinator.controller.signals); self._refresh_panels()
+        ctrl = self.coordinator.controller
+        self.scene.update_signals(ctrl.signals)
+        self.scene.update_traffic(step, ctrl.signals, ctrl.state, ctrl.target_approach)
+        self._refresh_panels()
         if self.health_elapsed >= 1.0:
             self.health_elapsed = 0.0
             self._refresh_health()
