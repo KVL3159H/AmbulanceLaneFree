@@ -51,8 +51,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONObject
 import org.lifelane.mobile.ui.theme.ActiveGreen
 import org.lifelane.mobile.ui.theme.EmergencyRed
-import org.lifelane.mobile.ui.theme.WhatsAppShapes
-import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
+import org.lifelane.mobile.ui.theme.SwiggyOrange
+import org.lifelane.mobile.ui.theme.SwiggyShapes
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -142,7 +142,7 @@ fun RealTimeMapView(
         modifier = modifier
             .fillMaxWidth()
             .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier),
-        shape = WhatsAppShapes.card,
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = if (darkTheme) Color(0xFF101921) else Color(0xFFE8ECEF)),
         border = BorderStroke(1.dp, if (darkTheme) Color(0xFF233544) else Color(0xFFCBD5E1)),
     ) {
@@ -320,7 +320,7 @@ fun RealTimeMapView(
                         if (serviceState.gpsState == org.lifelane.mobile.GpsState.ACCURATE) "LIVE GPS · REAL MAP" else "LOCATION UNAVAILABLE · REAL MAP",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isEmergencyActive) EmergencyRed else WhatsAppVibrantGreen,
+                        color = if (isEmergencyActive) EmergencyRed else SwiggyOrange,
                     )
                     Text(
                         "· %.1f km/h".format(speedMps * 3.6f),
@@ -344,7 +344,7 @@ fun RealTimeMapView(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         CircularProgressIndicator(
-                            color = WhatsAppVibrantGreen,
+                            color = SwiggyOrange,
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp,
                         )

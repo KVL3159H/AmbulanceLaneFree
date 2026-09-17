@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MedicalServices
+import androidx.compose.material.icons.outlined.NearMe
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
@@ -47,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,40 +56,51 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.lifelane.mobile.PatientPriority
-import org.lifelane.mobile.R
 import org.lifelane.mobile.ui.theme.ActiveGreen
 import org.lifelane.mobile.ui.theme.EmergencyRed
 import org.lifelane.mobile.ui.theme.InformationBlue
 import org.lifelane.mobile.ui.theme.LifeLaneDimens
-import org.lifelane.mobile.ui.theme.MobilityTeal
+import org.lifelane.mobile.ui.theme.SwiggyBorder
+import org.lifelane.mobile.ui.theme.SwiggyGreen
+import org.lifelane.mobile.ui.theme.SwiggyGreenSoft
+import org.lifelane.mobile.ui.theme.SwiggyOrange
+import org.lifelane.mobile.ui.theme.SwiggyOrangeDark
+import org.lifelane.mobile.ui.theme.SwiggyOrangeSoft
+import org.lifelane.mobile.ui.theme.SwiggyShapes
+import org.lifelane.mobile.ui.theme.SwiggyTextBody
+import org.lifelane.mobile.ui.theme.SwiggyTextHeading
+import org.lifelane.mobile.ui.theme.SwiggyTokens
 import org.lifelane.mobile.ui.theme.WarningAmber
-import org.lifelane.mobile.ui.theme.WhatsAppBlueTick
-import org.lifelane.mobile.ui.theme.WhatsAppSecurityGold
-import org.lifelane.mobile.ui.theme.WhatsAppShapes
-import org.lifelane.mobile.ui.theme.WhatsAppTokens
-import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
 
 @Composable
 fun LifeLaneBrand(modifier: Modifier = Modifier, compact: Boolean = false, onDarkHeader: Boolean = false) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Icon(
-            painter = painterResource(R.drawable.lifelane_mark),
-            contentDescription = "LifeLane emergency mobility mark",
-            tint = Color.Unspecified,
-            modifier = Modifier.size(if (compact) 34.dp else 44.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(if (compact) 36.dp else 44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(SwiggyOrange),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.NearMe,
+                contentDescription = "LifeLane brand mark",
+                tint = Color.White,
+                modifier = Modifier.size(if (compact) 20.dp else 26.dp),
+            )
+        }
         Column {
             Text(
                 "LifeLane",
                 style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = if (onDarkHeader) Color.White else MaterialTheme.colorScheme.onSurface,
+                color = if (onDarkHeader) Color.White else SwiggyTextHeading,
             )
             if (!compact) {
                 Text(
-                    "Emergency Mobility Intelligence",
+                    "Smart Ambulance Priority",
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (onDarkHeader) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (onDarkHeader) Color.White.copy(alpha = 0.85f) else SwiggyTextBody,
                 )
             }
         }
@@ -103,31 +114,31 @@ fun LifeLaneTopBar(
     onToggleDark: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val barColor = MaterialTheme.colorScheme.surface
-    val contentColor = MaterialTheme.colorScheme.onSurface
+    val barColor = if (darkTheme) MaterialTheme.colorScheme.surface else Color.White
+    val contentColor = if (darkTheme) Color.White else SwiggyTextHeading
 
-    Surface(color = barColor, shadowElevation = 2.dp) {
+    Surface(color = barColor, shadowElevation = 3.dp) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 52.dp)
-                .padding(horizontal = LifeLaneDimens.pagePadding, vertical = 6.dp),
+                .defaultMinSize(minHeight = 56.dp)
+                .padding(horizontal = LifeLaneDimens.pagePadding, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            LifeLaneBrand(compact = true, onDarkHeader = false)
+            LifeLaneBrand(compact = true, onDarkHeader = darkTheme)
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = contentColor,
                     maxLines = 1,
                 )
                 Text(
-                    "Emergency mobility research prototype",
+                    "Real-Time Traffic Preemption",
                     style = MaterialTheme.typography.labelSmall,
-                    color = contentColor.copy(alpha = 0.75f),
+                    color = SwiggyTextBody,
                     maxLines = 1,
                 )
             }
@@ -137,22 +148,46 @@ fun LifeLaneTopBar(
 }
 
 @Composable
+fun SwiggyEtaChip(etaMinutes: Int?, distanceKm: Double?, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = SwiggyShapes.pill,
+        color = SwiggyGreenSoft,
+        border = BorderStroke(1.dp, SwiggyGreen.copy(alpha = 0.4f)),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(SwiggyGreen))
+            Text(
+                text = "${etaMinutes ?: 8} MINS" + if (distanceKm != null && distanceKm > 0) " · ${String.format("%.1f", distanceKm)} KM" else "",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = SwiggyGreen,
+            )
+        }
+    }
+}
+
+@Composable
 fun ConnectionBadge(type: String, status: String, modifier: Modifier = Modifier) {
     val isGood = status.equals("Live", ignoreCase = true) ||
                  status.equals("Accurate", ignoreCase = true) ||
                  status.equals("Connected", ignoreCase = true)
-    val dotColor = if (isGood) ActiveGreen else WarningAmber
-    val bg = if (isGood) ActiveGreen.copy(alpha = 0.08f) else WarningAmber.copy(alpha = 0.08f)
-    val borderCol = if (isGood) ActiveGreen.copy(alpha = 0.35f) else WarningAmber.copy(alpha = 0.35f)
+    val dotColor = if (isGood) SwiggyGreen else WarningAmber
+    val bg = if (isGood) SwiggyGreenSoft else WarningAmber.copy(alpha = 0.10f)
+    val borderCol = if (isGood) SwiggyGreen.copy(alpha = 0.35f) else WarningAmber.copy(alpha = 0.35f)
 
     Surface(
-        modifier = modifier.defaultMinSize(minHeight = 36.dp),
-        shape = WhatsAppShapes.pillBadge,
+        modifier = modifier.defaultMinSize(minHeight = 34.dp),
+        shape = SwiggyShapes.pill,
         color = bg,
         border = BorderStroke(1.dp, borderCol),
     ) {
         Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -161,7 +196,7 @@ fun ConnectionBadge(type: String, status: String, modifier: Modifier = Modifier)
                 text = "$type: $status",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = SwiggyTextHeading,
                 maxLines = 1,
             )
         }
@@ -177,8 +212,8 @@ fun WhatsAppCheckMarks(state: CheckMarkState, modifier: Modifier = Modifier) {
         CheckMarkState.DOUBLE_GREY, CheckMarkState.DOUBLE_BLUE -> Icons.Outlined.DoneAll
     }
     val tint = when (state) {
-        CheckMarkState.DOUBLE_BLUE -> WhatsAppBlueTick
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        CheckMarkState.DOUBLE_BLUE -> SwiggyGreen
+        else -> SwiggyTextBody
     }
     Icon(icon, contentDescription = null, tint = tint, modifier = modifier.size(16.dp))
 }
@@ -186,24 +221,24 @@ fun WhatsAppCheckMarks(state: CheckMarkState, modifier: Modifier = Modifier) {
 @Composable
 fun WhatsAppSecurityBanner(
     modifier: Modifier = Modifier,
-    text: String = "Research prototype. Controller status is shown only when received from the configured junction.",
+    text: String = "Swiggy-style live corridor. Signal priority is authenticated via local controller.",
     darkTheme: Boolean = false,
 ) {
-    val bg = WhatsAppTokens.securityCardBackground(darkTheme)
-    val textCol = WhatsAppTokens.securityCardTextColor(darkTheme)
+    val bg = if (darkTheme) Color(0xFF1C1F26) else SwiggyOrangeSoft
+    val textCol = if (darkTheme) SwiggyOrange else SwiggyOrangeDark
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = WhatsAppShapes.card,
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = bg),
-        border = BorderStroke(1.dp, WhatsAppSecurityGold),
+        border = BorderStroke(1.dp, SwiggyOrange.copy(alpha = 0.3f)),
     ) {
         Row(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Outlined.Lock, contentDescription = null, tint = MobilityTeal, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Lock, contentDescription = null, tint = SwiggyOrange, modifier = Modifier.size(18.dp))
             Text(
                 text,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 15.sp),
@@ -217,9 +252,9 @@ fun WhatsAppSecurityBanner(
 fun WarningBanner(title: String, detail: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = WhatsAppShapes.card,
-        colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.12f)),
-        border = BorderStroke(1.dp, WarningAmber.copy(alpha = 0.45f)),
+        shape = SwiggyShapes.card,
+        colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.10f)),
+        border = BorderStroke(1.dp, WarningAmber.copy(alpha = 0.40f)),
     ) {
         Row(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -229,12 +264,12 @@ fun WarningBanner(title: String, detail: String, modifier: Modifier = Modifier, 
             Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(20.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = WarningAmber)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = SwiggyTextHeading)
             }
             onRetry?.let {
                 OutlinedButton(
                     onClick = it,
-                    shape = WhatsAppShapes.pillBadge,
+                    shape = SwiggyShapes.pill,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp),
                 ) {
@@ -249,9 +284,9 @@ fun WarningBanner(title: String, detail: String, modifier: Modifier = Modifier, 
 fun ErrorBanner(title: String, detail: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = WhatsAppShapes.card,
-        colors = CardDefaults.cardColors(containerColor = EmergencyRed.copy(alpha = 0.12f)),
-        border = BorderStroke(1.dp, EmergencyRed.copy(alpha = 0.45f)),
+        shape = SwiggyShapes.card,
+        colors = CardDefaults.cardColors(containerColor = EmergencyRed.copy(alpha = 0.10f)),
+        border = BorderStroke(1.dp, EmergencyRed.copy(alpha = 0.40f)),
     ) {
         Row(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -261,7 +296,7 @@ fun ErrorBanner(title: String, detail: String, modifier: Modifier = Modifier) {
             Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = EmergencyRed, modifier = Modifier.size(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = EmergencyRed)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = SwiggyTextHeading)
             }
         }
     }
@@ -272,30 +307,31 @@ fun PriorityCard(priority: PatientPriority, selected: Boolean, onSelect: () -> U
     val details = when (priority) {
         PatientPriority.RED -> Triple("Critical", "Immediate life-threat (cardiac, major trauma)", EmergencyRed)
         PatientPriority.YELLOW -> Triple("Serious", "Severe injury or illness, urgent preemption", WarningAmber)
-        PatientPriority.GREEN -> Triple("Stable", "Medical transport requiring assistance", ActiveGreen)
+        PatientPriority.GREEN -> Triple("Stable", "Medical transport requiring assistance", SwiggyGreen)
     }
-    val targetBg = if (selected) WhatsAppTokens.outgoingBubbleColor(darkTheme) else MaterialTheme.colorScheme.surface
-    val targetBorder = if (selected) WhatsAppVibrantGreen else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val targetBg = if (selected) SwiggyOrangeSoft else (if (darkTheme) Color(0xFF1C1F26) else Color.White)
+    val targetBorder = if (selected) SwiggyOrange else SwiggyBorder
     val animatedBorder by animateColorAsState(targetBorder, label = "priority border")
 
     Card(
         modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
+            .defaultMinSize(minHeight = 68.dp)
             .clickable(role = Role.RadioButton, onClick = onSelect)
             .semantics { contentDescription = "${details.first} priority. ${details.second}. ${if (selected) "Selected" else "Not selected"}" },
-        shape = WhatsAppShapes.card,
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = targetBg),
         border = BorderStroke(if (selected) 2.dp else 1.dp, animatedBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 3.dp else 1.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(details.third.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center,
@@ -304,14 +340,14 @@ fun PriorityCard(priority: PatientPriority, selected: Boolean, onSelect: () -> U
             }
             Column(Modifier.weight(1f)) {
                 Text(details.first, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = details.third)
-                Text(details.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(details.second, style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
             }
             if (selected) {
-                Box(Modifier.size(22.dp).clip(CircleShape).background(WhatsAppVibrantGreen), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Done, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(15.dp))
+                Box(Modifier.size(24.dp).clip(CircleShape).background(SwiggyOrange), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Done, contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             } else {
-                Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = "Unselected", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = "Unselected", tint = SwiggyTextBody, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -319,48 +355,50 @@ fun PriorityCard(priority: PatientPriority, selected: Boolean, onSelect: () -> U
 
 @Composable
 fun ConditionChip(label: String, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier, darkTheme: Boolean = false) {
-    val bg = if (selected) WhatsAppTokens.outgoingBubbleColor(darkTheme) else MaterialTheme.colorScheme.surface
-    val borderCol = if (selected) WhatsAppVibrantGreen else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val bg = if (selected) SwiggyOrangeSoft else (if (darkTheme) Color(0xFF1C1F26) else Color.White)
+    val borderCol = if (selected) SwiggyOrange else SwiggyBorder
 
     Surface(
         modifier = modifier
-            .defaultMinSize(minHeight = 40.dp)
+            .defaultMinSize(minHeight = 42.dp)
             .clickable(role = Role.RadioButton, onClick = onSelect)
             .semantics { contentDescription = "$label, ${if (selected) "selected" else "not selected"}" },
-        shape = WhatsAppShapes.pillBadge,
+        shape = SwiggyShapes.chip,
         color = bg,
         border = BorderStroke(if (selected) 2.dp else 1.dp, borderCol),
+        shadowElevation = if (selected) 2.dp else 0.dp,
     ) {
         Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (selected) {
-                Box(Modifier.size(16.dp).clip(CircleShape).background(WhatsAppVibrantGreen), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(16.dp).clip(CircleShape).background(SwiggyOrange), contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.Done, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
                 }
             } else {
-                Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = SwiggyTextBody, modifier = Modifier.size(16.dp))
             }
-            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) SwiggyOrangeDark else SwiggyTextHeading)
         }
     }
 }
 
 @Composable
 fun LiveMetricCard(label: String, value: String, modifier: Modifier = Modifier, supporting: String? = null, isHighlight: Boolean = false, darkTheme: Boolean = false) {
-    val bg = if (isHighlight) WhatsAppTokens.outgoingBubbleColor(darkTheme) else MaterialTheme.colorScheme.surface
+    val bg = if (isHighlight) SwiggyOrangeSoft else (if (darkTheme) Color(0xFF1C1F26) else Color.White)
     Card(
         modifier,
-        shape = WhatsAppShapes.card,
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = bg),
-        border = BorderStroke(1.dp, if (isHighlight) WhatsAppVibrantGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, if (isHighlight) SwiggyOrange.copy(alpha = 0.5f) else SwiggyBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-            Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-            supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = SwiggyTextBody, maxLines = 1)
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp, color = SwiggyTextHeading, maxLines = 1)
+            supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = SwiggyOrangeDark, maxLines = 1) }
         }
     }
 }
@@ -369,32 +407,33 @@ fun LiveMetricCard(label: String, value: String, modifier: Modifier = Modifier, 
 fun EmergencyStatusCard(stages: List<String>, currentStage: Int, modifier: Modifier = Modifier) {
     Card(
         modifier.fillMaxWidth(),
-        shape = WhatsAppShapes.card,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        shape = SwiggyShapes.card,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, SwiggyBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
-        Column(Modifier.padding(LifeLaneDimens.cardPadding), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(Modifier.padding(LifeLaneDimens.cardPadding), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Emergency route progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Controller timeline", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                Text("Live Preemption Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+                Text("CORRIDOR", style = MaterialTheme.typography.labelSmall, color = SwiggyOrange, fontWeight = FontWeight.Bold)
             }
             stages.forEachIndexed { index, stage ->
                 val reached = index < currentStage
                 val activeCurrent = index == currentStage
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     when {
-                        reached -> Icon(Icons.Outlined.CheckCircle, "Completed", tint = WhatsAppVibrantGreen, modifier = Modifier.size(16.dp))
-                        activeCurrent -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = InformationBlue)
-                        else -> Icon(Icons.Outlined.RadioButtonUnchecked, "Pending", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                        reached -> Icon(Icons.Outlined.CheckCircle, "Completed", tint = SwiggyGreen, modifier = Modifier.size(18.dp))
+                        activeCurrent -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.5.dp, color = SwiggyOrange)
+                        else -> Icon(Icons.Outlined.RadioButtonUnchecked, "Pending", tint = SwiggyBorder, modifier = Modifier.size(18.dp))
                     }
                     Text(
                         stage,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (activeCurrent) FontWeight.Bold else FontWeight.Normal,
                         color = when {
-                            activeCurrent -> WhatsAppVibrantGreen
-                            reached -> MaterialTheme.colorScheme.onSurface
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            activeCurrent -> SwiggyOrange
+                            reached -> SwiggyTextHeading
+                            else -> SwiggyTextBody
                         },
                     )
                 }
@@ -407,18 +446,18 @@ fun EmergencyStatusCard(stages: List<String>, currentStage: Int, modifier: Modif
 fun PrimaryActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 52.dp),
         enabled = enabled,
-        shape = WhatsAppShapes.actionButton,
+        shape = SwiggyShapes.action,
         colors = ButtonDefaults.buttonColors(
-            containerColor = WhatsAppVibrantGreen,
+            containerColor = SwiggyOrange,
             contentColor = Color.White,
-            disabledContainerColor = WhatsAppVibrantGreen.copy(alpha = 0.38f),
+            disabledContainerColor = SwiggyOrange.copy(alpha = 0.38f),
             disabledContentColor = Color.White.copy(alpha = 0.6f),
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold))
+        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold))
     }
 }
 
@@ -426,16 +465,16 @@ fun PrimaryActionButton(text: String, onClick: () -> Unit, modifier: Modifier = 
 fun DangerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-        shape = WhatsAppShapes.actionButton,
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = 52.dp),
+        shape = SwiggyShapes.action,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = EmergencyRed,
             contentColor = Color.White,
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold))
+        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold))
     }
 }
 
@@ -444,23 +483,23 @@ fun DangerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = M
 fun ConfirmationBottomSheet(title: String, detail: String, confirmLabel: String, dangerous: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = SwiggyShapes.sheet,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = LifeLaneDimens.xlarge, vertical = LifeLaneDimens.large),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(detail, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+            Text(detail, style = MaterialTheme.typography.bodyLarge, color = SwiggyTextBody)
             if (dangerous) DangerActionButton(confirmLabel, onConfirm) else PrimaryActionButton(confirmLabel, onConfirm)
             OutlinedButton(
                 onDismiss,
                 Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                shape = WhatsAppShapes.actionButton,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                shape = SwiggyShapes.action,
+                border = BorderStroke(1.dp, SwiggyBorder),
             ) {
-                Text("Go back", color = MaterialTheme.colorScheme.onSurface)
+                Text("Go back", color = SwiggyTextHeading, fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -475,12 +514,12 @@ fun LoadingState(label: String, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            Modifier.size(44.dp).clip(CircleShape).background(WhatsAppVibrantGreen.copy(alpha = 0.15f)),
+            Modifier.size(48.dp).clip(CircleShape).background(SwiggyOrangeSoft),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = WhatsAppVibrantGreen, modifier = Modifier.size(26.dp))
+            Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = SwiggyOrange, modifier = Modifier.size(28.dp))
         }
-        Text(label, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, textAlign = TextAlign.Center, color = SwiggyTextBody)
     }
 }
 
@@ -489,14 +528,14 @@ fun EmptyState(title: String, detail: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), WhatsAppShapes.card)
+            .border(1.dp, SwiggyBorder, SwiggyShapes.card)
             .padding(20.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(Icons.Outlined.Info, contentDescription = null, tint = WhatsAppVibrantGreen, modifier = Modifier.size(28.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Icon(Icons.Outlined.Info, contentDescription = null, tint = SwiggyOrange, modifier = Modifier.size(30.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = SwiggyTextBody, textAlign = TextAlign.Center)
         }
     }
 }

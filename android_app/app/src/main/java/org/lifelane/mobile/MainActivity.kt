@@ -101,6 +101,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.Priority
@@ -108,6 +111,15 @@ import java.time.Duration
 import java.time.Instant
 import org.lifelane.mobile.ui.components.LiveRouteMapView
 import org.lifelane.mobile.ui.theme.LifeLaneTheme
+import org.lifelane.mobile.ui.theme.SwiggyBorder
+import org.lifelane.mobile.ui.theme.SwiggyGreen
+import org.lifelane.mobile.ui.theme.SwiggyGreenSoft
+import org.lifelane.mobile.ui.theme.SwiggyOrange
+import org.lifelane.mobile.ui.theme.SwiggyOrangeDark
+import org.lifelane.mobile.ui.theme.SwiggyOrangeSoft
+import org.lifelane.mobile.ui.theme.SwiggyShapes
+import org.lifelane.mobile.ui.theme.SwiggyTextBody
+import org.lifelane.mobile.ui.theme.SwiggyTextHeading
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -230,7 +242,11 @@ private fun LaunchScreen(onDone: () -> Unit) {
 
 @Composable
 private fun CommandHeader(title: String, state: TripUiState) {
-    Surface(color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        border = BorderStroke(1.dp, SwiggyBorder),
+    ) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -238,10 +254,29 @@ private fun CommandHeader(title: String, state: TripUiState) {
         ) {
             BrandMark(40)
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text("LifeLane · Laboratory network", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading, maxLines = 1)
+                Text(
+                    if (state.emergencyActive) "⚡ Priority Corridor Active" else "Swiggy Fast-Track Corridor",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (state.emergencyActive) SwiggyOrangeDark else SwiggyTextBody
+                )
             }
-            if (state.emergencyActive) StatusTag("Trip active", MaterialTheme.colorScheme.error, Icons.Outlined.NearMe)
+            if (state.emergencyActive) {
+                Surface(
+                    shape = SwiggyShapes.pill,
+                    color = SwiggyOrangeSoft,
+                    border = BorderStroke(1.dp, SwiggyOrange.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(SwiggyOrange))
+                        Text("ACTIVE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = SwiggyOrangeDark)
+                    }
+                }
+            }
         }
     }
 }
@@ -249,10 +284,10 @@ private fun CommandHeader(title: String, state: TripUiState) {
 @Composable
 private fun BrandMark(size: Int) {
     Box(
-        Modifier.size(size.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(13.dp)),
+        Modifier.size(size.dp).clip(RoundedCornerShape((size * 0.28f).dp)).background(SwiggyOrange),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Outlined.NearMe, "LifeLane", tint = Color.White, modifier = Modifier.size((size * .55f).dp))
+        Icon(Icons.Outlined.NearMe, "LifeLane", tint = Color.White, modifier = Modifier.size((size * 0.55f).dp))
     }
 }
 
@@ -260,18 +295,28 @@ private fun BrandMark(size: Int) {
 private fun CommandNavigation(current: AppScreen, vm: TripViewModel) {
     val items = listOf(
         Triple(AppScreen.HOME, "Home", Icons.Outlined.Home),
-        Triple(AppScreen.MAP, "Map", Icons.Outlined.Map),
+        Triple(AppScreen.MAP, "Live Map", Icons.Outlined.Map),
         Triple(AppScreen.TRIPS, "Trips", Icons.Outlined.History),
         Triple(AppScreen.SETTINGS, "Settings", Icons.Outlined.Settings),
     )
-    NavigationBar(Modifier.navigationBarsPadding(), containerColor = MaterialTheme.colorScheme.surface) {
-        items.forEach { (screen, label, icon) ->
-            NavigationBarItem(
-                selected = current == screen,
-                onClick = { when (screen) { AppScreen.HOME -> vm.openHome(); AppScreen.MAP -> vm.openMap(); AppScreen.TRIPS -> vm.openTrips(); else -> vm.openSettings() } },
-                icon = { Icon(icon, null) }, label = { Text(label) },
-                colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer),
-            )
+    Surface(shadowElevation = 10.dp, color = MaterialTheme.colorScheme.surface) {
+        NavigationBar(
+            Modifier.navigationBarsPadding(),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+        ) {
+            items.forEach { (screen, label, icon) ->
+                val selected = current == screen
+                NavigationBarItem(
+                    selected = selected,
+                    onClick = { when (screen) { AppScreen.HOME -> vm.openHome(); AppScreen.MAP -> vm.openMap(); AppScreen.TRIPS -> vm.openTrips(); else -> vm.openSettings() } },
+                    icon = { Icon(icon, null, tint = if (selected) SwiggyOrange else SwiggyTextBody) },
+                    label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = if (selected) SwiggyOrange else SwiggyTextBody) },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = SwiggyOrangeSoft,
+                    ),
+                )
+            }
         }
     }
 }
@@ -292,9 +337,9 @@ private fun AdaptiveScreen(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun PageIntro(title: String, description: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+        Text(description, style = MaterialTheme.typography.bodyMedium, color = SwiggyTextBody)
     }
 }
 
@@ -331,18 +376,41 @@ private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel) {
     AdaptiveScreen {
         PageIntro("Select ambulance", "Choose the vehicle authorized for this research session.")
         val selected = state.ambulanceId == "AMB-001"
-        Panel(
-            modifier = Modifier.clickable(role = Role.RadioButton) { vm.selectAmbulance("AMB-001") },
-            border = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.RadioButton) { vm.selectAmbulance("AMB-001") },
+            shape = SwiggyShapes.card,
+            colors = CardDefaults.cardColors(containerColor = if (selected) SwiggyOrangeSoft else Color.White),
+            border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) SwiggyOrange else SwiggyBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 3.dp else 1.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Icon(Icons.Outlined.DirectionsCar, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("AMB-001", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Prototype fleet · Registration not configured", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Authorization configured", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+            Row(
+                Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) SwiggyOrange else SwiggyOrangeSoft),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.DirectionsCar, null, tint = if (selected) Color.White else SwiggyOrange, modifier = Modifier.size(26.dp))
                 }
-                if (selected) Icon(Icons.Outlined.CheckCircle, "Selected", tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("AMB-001", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+                    Text("Prototype fleet · Research session active", color = SwiggyTextBody, style = MaterialTheme.typography.bodySmall)
+                    Surface(shape = SwiggyShapes.pill, color = SwiggyGreenSoft) {
+                        Text("Authorization verified", Modifier.padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = SwiggyGreen, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (selected) {
+                    Box(Modifier.size(26.dp).clip(CircleShape).background(SwiggyOrange), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.CheckCircle, "Selected", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
             }
         }
         state.message?.let { InlineError(it) }
@@ -354,12 +422,45 @@ private fun AmbulanceScreen(state: TripUiState, vm: TripViewModel) {
 private fun HomeScreen(state: TripUiState, vm: TripViewModel) {
     AdaptiveScreen {
         PageIntro("Ready for service", "Everything needed for an emergency trip, visible at a glance.")
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(22.dp)) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatusTag("Emergency mobility", MaterialTheme.colorScheme.primary, Icons.Outlined.NearMe)
-                Text("Start emergency trip", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Create a priority route to a receiving hospital.", color = MaterialTheme.colorScheme.onPrimaryContainer)
-                CommandButton("Start trip", true, vm::startTripSetup)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = SwiggyShapes.card,
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Brush.horizontalGradient(listOf(SwiggyOrange, Color(0xFFFD5B1D))))
+                    .padding(20.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.22f),
+                        shape = SwiggyShapes.pill,
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(Icons.Outlined.NearMe, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                            Text("SWIGGY-SPEED CORRIDOR", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Start Emergency Trip", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                        Text("Create a green priority corridor to the receiving hospital.", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Button(
+                        onClick = vm::startTripSetup,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = SwiggyShapes.action,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SwiggyOrange),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+                    ) {
+                        Text("SETUP TRIP", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    }
+                }
             }
         }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -488,16 +589,63 @@ private fun HospitalList(state: TripUiState, hospitals: List<HospitalDestination
 
 @Composable
 private fun HospitalRow(hospital: HospitalDestination, selected: Boolean, onSelect: () -> Unit) {
-    Panel(Modifier.clickable(onClick = onSelect), if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Outlined.LocalHospital, null, tint = MaterialTheme.colorScheme.secondary)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(hospital.name, fontWeight = FontWeight.Bold)
-                Text(hospital.specialty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                Text(hospital.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${hospital.supportedJunctions} supported junction${if (hospital.supportedJunctions == 1) "" else "s"}", style = MaterialTheme.typography.labelSmall)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect),
+        shape = SwiggyShapes.card,
+        colors = CardDefaults.cardColors(containerColor = if (selected) SwiggyOrangeSoft else Color.White),
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) SwiggyOrange else SwiggyBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 3.dp else 1.dp),
+    ) {
+        Row(
+            Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) SwiggyOrange else SwiggyOrangeSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.LocalHospital,
+                    null,
+                    tint = if (selected) Color.White else SwiggyOrange,
+                    modifier = Modifier.size(24.dp),
+                )
             }
-            Text(if (hospital.distanceKm > 0) formatDistance(hospital.distanceKm * 1000) else "Unavailable", style = MaterialTheme.typography.labelMedium)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(hospital.name, fontWeight = FontWeight.Bold, color = SwiggyTextHeading, fontSize = 16.sp)
+                Text(hospital.specialty, style = MaterialTheme.typography.bodySmall, color = SwiggyOrangeDark, fontWeight = FontWeight.SemiBold)
+                Text(hospital.address, style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
+                Text(
+                    "${hospital.supportedJunctions} supported junction${if (hospital.supportedJunctions == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SwiggyTextBody,
+                )
+            }
+            Surface(
+                shape = SwiggyShapes.pill,
+                color = SwiggyGreenSoft,
+                border = BorderStroke(1.dp, SwiggyGreen.copy(alpha = 0.35f)),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(SwiggyGreen))
+                    Text(
+                        if (hospital.distanceKm > 0) formatDistance(hospital.distanceKm * 1000) else "Nearby",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = SwiggyGreen,
+                    )
+                }
+            }
         }
     }
 }
@@ -529,35 +677,99 @@ private fun ActiveTripScreen(state: TripUiState, vm: TripViewModel) {
         val compactHeight = maxHeight < 650.dp
         val sheetMaxHeight = maxHeight * .58f
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Emergency trip active", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(state.destination, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Surface(
+                color = Color.White,
+                shadowElevation = 2.dp,
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SwiggyOrange),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.NearMe, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Live Delivery Corridor", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+                        Text(state.destination, color = SwiggyTextBody, maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                    }
+                    StatusTag(state.priority.label(), state.priority.colour(), Icons.Outlined.LocalHospital)
                 }
-                StatusTag(state.priority.label(), state.priority.colour(), Icons.Outlined.LocalHospital)
             }
             RouteMap(state, Modifier.fillMaxWidth().weight(1f), vm)
-            Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 10.dp, shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)) {
+            Surface(
+                color = Color.White,
+                shadowElevation = 12.dp,
+                shape = SwiggyShapes.sheet,
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().heightIn(max = sheetMaxHeight).verticalScroll(rememberScrollState()).padding(16.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = sheetMaxHeight)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
                 ) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .width(40.dp)
+                            .height(4.dp)
+                            .background(SwiggyBorder, CircleShape),
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatusTag("GPS ${state.gpsState.label()}", state.gpsState.colour(), Icons.Outlined.LocationOn, Modifier.weight(1f))
                         StatusTag("Control ${state.mqttState.label()}", state.mqttState.colour(), Icons.Outlined.NearMe, Modifier.weight(1f))
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column { Text("Next junction", style = MaterialTheme.typography.labelSmall); Text(state.nextJunction, fontWeight = FontWeight.Bold) }
-                        Column(horizontalAlignment = Alignment.End) { Text("Distance", style = MaterialTheme.typography.labelSmall); Text(state.distanceMetres?.let(::formatDistance) ?: "—", fontWeight = FontWeight.Bold) }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(SwiggyOrangeSoft, SwiggyShapes.card)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text("NEXT JUNCTION", style = MaterialTheme.typography.labelSmall, color = SwiggyOrangeDark, fontWeight = FontWeight.Bold)
+                            Text(state.nextJunction, fontWeight = FontWeight.ExtraBold, color = SwiggyTextHeading, fontSize = 16.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("DISTANCE", style = MaterialTheme.typography.labelSmall, color = SwiggyOrangeDark, fontWeight = FontWeight.Bold)
+                            Text(state.distanceMetres?.let(::formatDistance) ?: "—", fontWeight = FontWeight.ExtraBold, color = SwiggyOrange, fontSize = 16.sp)
+                        }
                     }
                     JunctionTimeline(state.junctionState)
-                    Text("Approach: ${state.detectedApproach} · GPS accuracy: ${state.accuracyMetres?.toInt()?.let { "$it m" } ?: "Unavailable"}", style = MaterialTheme.typography.bodySmall)
-                    Text("Queue: ${state.queuePosition?.toString() ?: "—"} · Cleared junctions: ${state.clearedJunctionCount}", style = MaterialTheme.typography.bodySmall)
-                    Text("Raspberry Pi: ${if(state.acknowledgement == null) "Awaiting authenticated acknowledgement" else state.requestStatus}", style = MaterialTheme.typography.bodySmall)
+                    Text("Approach: ${state.detectedApproach} · GPS accuracy: ${state.accuracyMetres?.toInt()?.let { "$it m" } ?: "Unavailable"}", style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
+                    Text("Queue: ${state.queuePosition?.toString() ?: "—"} · Cleared junctions: ${state.clearedJunctionCount}", style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
+                    Text("Raspberry Pi: ${if (state.acknowledgement == null) "Awaiting authenticated acknowledgement" else state.requestStatus}", style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
                     if (state.mqttState != ConnectionState.CONNECTED) InlineBanner("Control connection interrupted", "Last confirmed state retained. Signal priority is not confirmed.", vm::retryConnections)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(vm::requestCancel, Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancel") }
-                        Button(vm::requestDelivery, Modifier.weight(1f).height(52.dp)) { Text("Complete trip") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = vm::requestCancel,
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = SwiggyShapes.action,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) {
+                            Text("Cancel", fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = vm::requestDelivery,
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = SwiggyShapes.action,
+                            colors = ButtonDefaults.buttonColors(containerColor = SwiggyGreen, contentColor = Color.White),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                        ) {
+                            Text("Complete trip", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -668,65 +880,153 @@ private fun RouteMap(state: TripUiState, modifier: Modifier, vm: TripViewModel) 
 }
 
 @Composable
-private fun Panel(modifier: Modifier = Modifier, border: Color = MaterialTheme.colorScheme.outlineVariant, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, border)) {
+private fun Panel(modifier: Modifier = Modifier, border: Color = SwiggyBorder, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier.fillMaxWidth(),
+        shape = SwiggyShapes.card,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, border),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
 @Composable
 private fun MetricPanel(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Panel { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary); Column { Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Bold) } } }
-}
-
-@Composable
-private fun DetailPanel(title: String, rows: List<Pair<String, String>>) {
-    Panel { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); rows.forEachIndexed { index, row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { Text(row.first, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant); Text(row.second, Modifier.weight(1f), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End) }; if (index < rows.lastIndex) HorizontalDivider() } }
-}
-
-@Composable
-private fun CommandButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Button(onClick, Modifier.fillMaxWidth().height(54.dp), enabled = enabled, shape = RoundedCornerShape(14.dp)) { Text(label, fontWeight = FontWeight.Bold) }
-}
-
-@Composable
-private fun TextButtonRow(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick, Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null); Spacer(Modifier.width(8.dp)); Text(label) }
-}
-
-@Composable
-private fun StatusTag(label: String, colour: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
-    Surface(modifier, color = colour.copy(alpha = .12f), contentColor = colour, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, colour.copy(alpha = .35f))) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Icon(icon, null, Modifier.size(16.dp)); Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1) }
-    }
-}
-
-@Composable
-private fun InlineBanner(title: String, detail: String, action: (() -> Unit)? = null) {
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(14.dp)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold); Text(detail, style = MaterialTheme.typography.bodySmall) }
-            if (action != null) OutlinedButton(action) { Text("Retry") }
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SwiggyOrangeSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = SwiggyOrange, modifier = Modifier.size(22.dp))
+            }
+            Column {
+                Text(label, style = MaterialTheme.typography.labelMedium, color = SwiggyTextBody)
+                Text(value, fontWeight = FontWeight.Bold, color = SwiggyTextHeading, fontSize = 15.sp)
+            }
         }
     }
 }
 
 @Composable
-private fun InlineError(text: String) { Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+private fun DetailPanel(title: String, rows: List<Pair<String, String>>) {
+    Panel {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+        rows.forEachIndexed { index, row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(row.first, Modifier.weight(1f), color = SwiggyTextBody, style = MaterialTheme.typography.bodyMedium)
+                Text(row.second, Modifier.weight(1f), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, color = SwiggyTextHeading, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (index < rows.lastIndex) HorizontalDivider(color = SwiggyBorder)
+        }
+    }
+}
+
+@Composable
+private fun CommandButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        enabled = enabled,
+        shape = SwiggyShapes.action,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = SwiggyOrange,
+            contentColor = Color.White,
+            disabledContainerColor = SwiggyOrange.copy(alpha = 0.38f),
+            disabledContentColor = Color.White.copy(alpha = 0.6f),
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+    ) {
+        Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun TextButtonRow(label: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = SwiggyShapes.action,
+        border = BorderStroke(1.dp, SwiggyBorder),
+    ) {
+        Icon(Icons.AutoMirrored.Outlined.ArrowBack, null, tint = SwiggyTextBody)
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = SwiggyTextHeading, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun StatusTag(label: String, colour: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = colour.copy(alpha = .12f),
+        contentColor = colour,
+        shape = SwiggyShapes.pill,
+        border = BorderStroke(1.dp, colour.copy(alpha = .35f)),
+    ) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, null, Modifier.size(15.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun InlineBanner(title: String, detail: String, action: (() -> Unit)? = null) {
+    Surface(
+        color = SwiggyOrangeSoft,
+        shape = SwiggyShapes.card,
+        border = BorderStroke(1.dp, SwiggyOrange.copy(alpha = 0.25f)),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, color = SwiggyOrangeDark)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = SwiggyTextHeading)
+            }
+            if (action != null) {
+                OutlinedButton(
+                    onClick = action,
+                    shape = SwiggyShapes.pill,
+                    border = BorderStroke(1.dp, SwiggyOrange),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SwiggyOrange),
+                ) {
+                    Text("Retry", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineError(text: String) {
+    Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+}
 
 @Composable
 private fun StepHeader(step: Int, label: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(color = MaterialTheme.colorScheme.primary, shape = CircleShape) { Text(step.toString(), Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = Color.White, fontWeight = FontWeight.Bold) }
-        Text("Step $step of 3 · $label", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(
+            modifier = Modifier.size(26.dp).clip(CircleShape).background(SwiggyOrange),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(step.toString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+        Text("Step $step of 3 · $label", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = SwiggyTextHeading)
     }
 }
 
 @Composable
 private fun JunctionTimeline(stage: JunctionState) {
-    val stages=listOf("Monitoring route","Junction detected","Confirming approach","Request sent","Controller validated",
-        "Preparing safe signal","Green corridor active","Junction entered","Junction cleared","Normal signal restored")
-    val index=when(stage) {
+    val stages = listOf(
+        "Monitoring route", "Junction detected", "Confirming approach", "Request sent", "Controller validated",
+        "Preparing safe signal", "Green corridor active", "Junction entered", "Junction cleared", "Normal signal restored"
+    )
+    val index = when (stage) {
         JunctionState.OUTSIDE_COVERAGE -> 0
         JunctionState.JUNCTION_CANDIDATE -> 1
         JunctionState.APPROACH_CONFIRMING, JunctionState.APPROACH_CONFIRMED -> 2
@@ -739,12 +1039,29 @@ private fun JunctionTimeline(stage: JunctionState) {
         JunctionState.COMPLETED -> 9
         else -> -1
     }
-    Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
-        Text(if(index>=0) stages[index] else stage.name.replace('_',' '),fontWeight=FontWeight.Bold,
-            color=if(index>=0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            repeat(stages.size) { step -> Box(Modifier.weight(1f).height(5.dp).background(
-                if(step<=index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,CircleShape)) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (index >= 0) stages[index] else stage.name.replace('_', ' '),
+                fontWeight = FontWeight.Bold,
+                color = if (index >= 0) SwiggyOrange else MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (index == 6) {
+                Surface(color = SwiggyGreenSoft, shape = SwiggyShapes.pill) {
+                    Text("ACTIVE", Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = SwiggyGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(stages.size) { step ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .background(if (step <= index) SwiggyOrange else SwiggyBorder, CircleShape),
+                )
+            }
         }
     }
 }
@@ -757,11 +1074,11 @@ private fun screenTitle(screen: AppScreen) = when (screen) {
 
 private fun PatientPriority?.label() = when (this) { PatientPriority.RED -> "Critical"; PatientPriority.YELLOW -> "Serious"; PatientPriority.GREEN -> "Stable"; null -> "Not selected" }
 private fun PatientPriority.description() = when (this) { PatientPriority.RED -> "Immediate life-threatening emergency"; PatientPriority.YELLOW -> "Urgent treatment required"; PatientPriority.GREEN -> "Assisted medical transport" }
-@Composable private fun PatientPriority?.colour() = when (this) { PatientPriority.RED -> MaterialTheme.colorScheme.error; PatientPriority.YELLOW -> Color(0xFFD97706); PatientPriority.GREEN -> MaterialTheme.colorScheme.secondary; null -> MaterialTheme.colorScheme.primary }
+@Composable private fun PatientPriority?.colour() = when (this) { PatientPriority.RED -> MaterialTheme.colorScheme.error; PatientPriority.YELLOW -> Color(0xFFD97706); PatientPriority.GREEN -> SwiggyGreen; null -> SwiggyOrange }
 private fun GpsState.label() = name.lowercase().replace('_', ' ').replaceFirstChar(Char::titlecase)
 private fun ConnectionState.label() = name.lowercase().replace('_', ' ').replaceFirstChar(Char::titlecase)
 private fun JunctionStage.label() = name.lowercase().replace('_', ' ').replaceFirstChar(Char::titlecase)
-@Composable private fun GpsState.colour() = when (this) { GpsState.ACCURATE -> MaterialTheme.colorScheme.secondary; GpsState.LOCATING, GpsState.LOW_ACCURACY, GpsState.LAST_KNOWN -> Color(0xFFD97706); else -> MaterialTheme.colorScheme.error }
-@Composable private fun ConnectionState.colour() = when (this) { ConnectionState.CONNECTED -> MaterialTheme.colorScheme.secondary; ConnectionState.CONNECTING -> Color(0xFFD97706); else -> MaterialTheme.colorScheme.error }
+@Composable private fun GpsState.colour() = when (this) { GpsState.ACCURATE -> SwiggyGreen; GpsState.LOCATING, GpsState.LOW_ACCURACY, GpsState.LAST_KNOWN -> Color(0xFFD97706); else -> MaterialTheme.colorScheme.error }
+@Composable private fun ConnectionState.colour() = when (this) { ConnectionState.CONNECTED -> SwiggyGreen; ConnectionState.CONNECTING -> Color(0xFFD97706); else -> MaterialTheme.colorScheme.error }
 private fun formatDistance(metres: Double) = if (metres < 1000) "${metres.toInt()} m" else "%.1f km".format(metres / 1000)
 private fun formatDuration(seconds: Long) = if (seconds < 60) "Less than 1 min" else "${seconds / 60} min"
