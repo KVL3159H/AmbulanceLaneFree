@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from datetime import datetime, timedelta, timezone
 
 pytest.importorskip("PySide6")
 
@@ -26,8 +27,8 @@ def test_professional_shell_navigation_and_scaling(config, monkeypatch, qtbot):
     qtbot.wait(100)
     assert window.minimumWidth() == 1100
     assert window.minimumHeight() == 700
-    assert window.page_stack.count() == 5
-    for page in range(5):
+    assert window.page_stack.count() == 8
+    for page in range(8):
         window.show_page(page)
         assert window.page_stack.currentIndex() == page
         assert window.page_title.text() == window.PAGE_TITLES[page]
@@ -38,9 +39,12 @@ def test_live_emergency_queue_and_gps_loss_states(config, monkeypatch, qtbot):
     window.start_simulation(Approach.NORTH)
     simulation = window.simulations[-1]
     simulation.signed_distance_metres = 100
-    packet = simulation.next_packet()
-    assert packet is not None
-    window.process_packet(packet)
+    simulation.advance_after_packet = True
+    now = datetime.now(timezone.utc)
+    for i in range(4):
+        packet = simulation.next_packet(now-timedelta(seconds=3-i))
+        assert packet is not None
+        window.process_packet(packet)
     window.coordinator.tick(1)
     window._refresh_panels()
     assert not window.emergency_card.content.isHidden()
@@ -61,8 +65,10 @@ def test_fail_safe_has_explicit_critical_presentation(config, monkeypatch, qtbot
 
 def test_active_emergency_tracks_controller_selection(config, packet_factory, monkeypatch, qtbot):
     window = make_window(config, monkeypatch, qtbot)
-    window.process_packet(packet_factory(Approach.NORTH, distance=100, ambulance_id="AMB-001", trip_id="N"))
-    window.process_packet(packet_factory(Approach.EAST, distance=100, ambulance_id="AMB-002", trip_id="E"))
+    now = datetime.now(timezone.utc)
+    for side, identity, trip in [(Approach.NORTH,"AMB-001","N"),(Approach.EAST,"AMB-002","E")]:
+        for i in range(4):
+            window.process_packet(packet_factory(side, distance=130-10*i, sequence=i+1, ambulance_id=identity, trip_id=trip, timestamp=now-timedelta(seconds=3-i)))
     window._refresh_panels()
     assert window.coordinator.controller.target_trip_id == "N"
     assert window.emergency_card.rows["ambulance"].value.text() == "AMB-001"
@@ -76,3 +82,78 @@ def test_rejected_request_is_visible_with_reason(config, packet_factory, monkeyp
     assert window.queue_page.outcomes.rowCount() == 1
     assert window.queue_page.outcomes.item(0, 6).text() == "Rejected"
     assert "accuracy" in window.queue_page.outcomes.item(0, 7).text().lower()
+
+
+def test_hardware_monitor_never_ticks_local_controller(config, monkeypatch, qtbot):
+    import time
+    from raspberry_pi_app.core.signal_states import SignalColour
+    window = make_window(config, monkeypatch, qtbot)
+    class Monitor:
+        stopped = False
+        def stop(self): self.stopped = True
+    monitor = Monitor()
+    window.hardware_monitor = monitor
+    window.hardware_heartbeat = time.monotonic()
+    window.hardware_lamps = {s: SignalColour.RED for s in Approach}
+    monkeypatch.setattr(window.coordinator, "tick", lambda *args: pytest.fail("Local controller ran in hardware mode"))
+    window.traffic.spawn(Approach.NORTH)
+    window._advance_simulation(0.5)
+    position = window.traffic.vehicles[0].progress
+    window.hardware_heartbeat -= 6
+    window._advance_simulation(1)
+    assert window.traffic.vehicles[0].progress == position
+    window.traffic.running=False
+    window._tick()
+    assert "unavailable" in window.system_badge.text()
+    window.start_simulation(Approach.EAST)
+    assert monitor.stopped and window.hardware_monitor is None
+    assert "SIMULATION" in window.statusBar().currentMessage()
+
+
+def test_simulated_gps_clock_uses_simulation_elapsed_time(config, monkeypatch, qtbot):
+    window = make_window(config, monkeypatch, qtbot)
+    start = window.simulation_clock
+    window._advance_simulation(0.5)
+    window._advance_simulation(2)
+    assert (window.simulation_clock-start).total_seconds() == 2.5
+
+
+def test_continuous_desktop_ambulance_clears_and_restores(config, monkeypatch, qtbot):
+    window=make_window(config,monkeypatch,qtbot)
+    window.start_simulation(Approach.NORTH)
+    trip=window.simulations[-1].trip_id
+    for _ in range(360): window._advance_simulation(.5)
+    assert window.coordinator.outcomes.get(trip)=="JUNCTION_CLEARED"
+    assert not window.simulations
+    report=window.structured_log.trip_report(trip)
+    assert report["checks"]["normalRestorationRecorded"]
+    assert window.traffic.cleared > 0
+    measured=next(row for row in window.structured_log.metrics()["ambulanceMeasurements"] if row["tripId"]==trip)
+    assert measured["junctionOccupationSeconds"] > 0
+    assert measured["monitoredTravelSeconds"] > measured["junctionOccupationSeconds"]
+
+
+def test_delayed_simulation_packets_are_rejected_as_stale(config, monkeypatch, qtbot):
+    window=make_window(config,monkeypatch,qtbot)
+    window.start_simulation(Approach.NORTH)
+    window.simulations[-1].network_delay_seconds=8
+    for _ in range(24): window._advance_simulation(.5)
+    assert window.latest_assessment is not None
+    assert not window.latest_assessment.valid
+    assert "stale" in window.latest_assessment.reason
+    assert len(window.coordinator.priority)==0
+
+
+def test_stop_finishes_yellow_before_holding_all_red(config,monkeypatch,qtbot):
+    from raspberry_pi_app.core.signal_states import SignalColour
+    window=make_window(config,monkeypatch,qtbot)
+    for _ in range(6): window._advance_simulation(.5)
+    assert SignalColour.GREEN in window.coordinator.controller.signals.values()
+    window.stop_simulation()
+    yellow=False
+    for _ in range(60):
+        window._advance_simulation(.5)
+        yellow |= SignalColour.YELLOW in window.coordinator.controller.signals.values()
+        if not window.traffic.running: break
+    assert yellow and not window.traffic.running
+    assert all(c is SignalColour.RED for c in window.coordinator.controller.signals.values())

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Emergency Way priority request v2",
+  "type": "object",
+  "required": [
+    "ambulanceId",
+    "approachConfidence",
+    "approachSide",
+    "controllerId",
+    "destinationHospitalId",
+    "destinationHospitalName",
+    "destinationLatitude",
+    "destinationLongitude",
+    "distanceToStopLine",
+    "gpsAccuracy",
+    "heading",
+    "junctionEtaSeconds",
+    "junctionId",
+    "latitude",
+    "longitude",
+    "medicalPriority",
+    "messageType",
+    "requestId",
+    "routeDistanceMetres",
+    "routeEtaSeconds",
+    "schemaVersion",
+    "speed",
+    "supportedJunctionCount",
+    "timestamp",
+    "tripId"
+  ],
+  "properties": {
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "routeEtaSeconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "destinationHospitalName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "medicalPriority": {
+      "enum": [
+        "Critical",
+        "Serious",
+        "Stable"
+      ]
+    },
+    "schemaVersion": {
+      "const": 2
+    },
+    "approachSide": {
+      "enum": [
+        "NORTH",
+        "EAST",
+        "SOUTH",
+        "WEST"
+      ]
+    },
+    "gpsAccuracy": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 30
+    },
+    "heading": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 360
+    },
+    "junctionEtaSeconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tripId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controllerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "speed": {
+      "type": "number",
+      "minimum": 0
+    },
+    "approachConfidence": {
+      "type": "number",
+      "minimum": 80,
+      "maximum": 100
+    },
+    "routeDistanceMetres": {
+      "type": "number",
+      "minimum": 0
+    },
+    "junctionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambulanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supportedJunctionCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "destinationLongitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "distanceToStopLine": {
+      "type": "number",
+      "minimum": 0
+    },
+    "messageType": {
+      "const": "PRIORITY_REQUEST"
+    },
+    "destinationHospitalId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destinationLatitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    }
+  },
+  "additionalProperties": false
+}

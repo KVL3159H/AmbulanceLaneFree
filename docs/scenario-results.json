@@ -1,0 +1,142 @@
+[
+  {
+    "scenario": 1,
+    "name": "Normal traffic",
+    "expected": "Vehicles stop at red and clear on green",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 2,
+    "name": "Critical ambulance from North",
+    "expected": "North selected and normal restored after measured clearance",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 3,
+    "name": "Serious ambulance from East",
+    "expected": "East selected and normal restored after measured clearance",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 4,
+    "name": "Stable ambulance from South",
+    "expected": "South selected and normal restored after measured clearance",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 5,
+    "name": "Conflicting ambulances",
+    "expected": "Second request queues; no conflicting greens",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 6,
+    "name": "Different medical priorities",
+    "expected": "Critical ranks before Stable",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 7,
+    "name": "Inaccurate GPS",
+    "expected": "No request from poor-accuracy samples",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 8,
+    "name": "Stale GPS",
+    "expected": "No request from stale location",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 9,
+    "name": "Stopped ambulance",
+    "expected": "Stationary heading never confirms a new request",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 10,
+    "name": "Route cancellation",
+    "expected": "Cancelled request cannot requeue",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 11,
+    "name": "U-turn",
+    "expected": "Repeated movement away cancels selected approach",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 12,
+    "name": "MQTT loss before request",
+    "expected": "No authenticated request means no priority grant",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 13,
+    "name": "MQTT loss after grant",
+    "expected": "Lost telemetry expires emergency green safely",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 14,
+    "name": "Controller rejection",
+    "expected": "Unauthorized ambulance cannot request priority",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 15,
+    "name": "Heartbeat lost",
+    "expected": "Watchdog latches a fault",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 16,
+    "name": "Maximum green timeout",
+    "expected": "Yellow and all-red before normal restoration",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 17,
+    "name": "Normal ambulance passage",
+    "expected": "Entry and exit confirmed from repeated samples",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 18,
+    "name": "Duplicate telemetry",
+    "expected": "Sequence replay is rejected",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 19,
+    "name": "Stale request telemetry",
+    "expected": "Expired source data is rejected",
+    "result": "PASS",
+    "scope": "component simulation"
+  },
+  {
+    "scenario": 20,
+    "name": "GPIO conflict fault",
+    "expected": "Interlock rejects conflicting greens and latches all-red",
+    "result": "PASS",
+    "scope": "component simulation"
+  }
+]

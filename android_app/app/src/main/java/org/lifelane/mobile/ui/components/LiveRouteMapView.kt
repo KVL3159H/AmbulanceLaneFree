@@ -103,25 +103,18 @@ fun LiveRouteMapView(
     distanceMetres: Double?,
     isEmergencyActive: Boolean,
     darkTheme: Boolean,
+    priorityConfirmed: Boolean = false,
     modifier: Modifier = Modifier,
     isExpandedView: Boolean = false,
     accuracyMetres: Float? = null,
     onToggleExpand: (() -> Unit)? = null,
+    onMapError: (String?) -> Unit = {},
 ) {
     // Toggle between real-world OpenStreetMap tile view and tactical radar HUD
     var showRealMap by remember { mutableStateOf(true) }
 
-    // Dynamic corridor junction estimation based on location
-    val dynamicJunctionLat = when {
-        ambulanceLat != null && destinationLat != null -> (ambulanceLat + destinationLat) / 2.0
-        ambulanceLat != null -> ambulanceLat - 0.003
-        else -> JUNCTION_LAT
-    }
-    val dynamicJunctionLon = when {
-        ambulanceLon != null && destinationLon != null -> (ambulanceLon + destinationLon) / 2.0
-        ambulanceLon != null -> ambulanceLon
-        else -> JUNCTION_LON
-    }
+    val dynamicJunctionLat = JUNCTION_LAT
+    val dynamicJunctionLon = JUNCTION_LON
 
     if (showRealMap) {
         RealTimeMapView(
@@ -140,6 +133,7 @@ fun LiveRouteMapView(
             detectedApproach = detectedApproach,
             distanceMetres = distanceMetres,
             isEmergencyActive = isEmergencyActive,
+            priorityConfirmed = priorityConfirmed,
             darkTheme = darkTheme,
             modifier = modifier,
             isExpandedView = isExpandedView,
@@ -207,7 +201,7 @@ fun LiveRouteMapView(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier.height(340.dp)),
+            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier),
         shape = WhatsAppShapes.card,
         colors = CardDefaults.cardColors(containerColor = mapBgColor),
         border = BorderStroke(1.dp, if (darkTheme) Color(0xFF233544) else Color(0xFFCBD5E1)),
@@ -299,6 +293,7 @@ fun LiveRouteMapView(
                 signalStatus = signalStatus,
                 detectedApproach = detectedApproach,
                 isEmergencyActive = isEmergencyActive,
+                priorityConfirmed = priorityConfirmed,
                 darkTheme = darkTheme,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -859,11 +854,12 @@ internal fun FloatingNavigationCard(
     signalStatus: String,
     detectedApproach: String,
     isEmergencyActive: Boolean,
+    priorityConfirmed: Boolean,
     darkTheme: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val cardBg = (if (darkTheme) Color(0xFF0F172A) else Color.White).copy(alpha = 0.94f)
-    val isGreenPreemption = signalStatus.contains("GREEN", true) && detectedApproach != "Not detected"
+    val isGreenPreemption = priorityConfirmed
 
     Surface(
         modifier = modifier.shadow(8.dp, RoundedCornerShape(14.dp)),
@@ -896,7 +892,7 @@ internal fun FloatingNavigationCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isGreenPreemption) "Green Wave Active · Cross Junction" else "En Route to ${destination.ifBlank { "Destination" }}",
+                    text = if (isGreenPreemption) "Priority confirmed · Proceed safely" else "En route to ${destination.ifBlank { "destination" }}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = if (darkTheme) Color.White else Color(0xFF0F172A),

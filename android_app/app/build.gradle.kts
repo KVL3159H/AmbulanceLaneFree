@@ -19,6 +19,8 @@ android {
         applicationId = "org.lifelane.mobile"
         minSdk = 26
         targetSdk = 36
+        buildConfigField("String", "DEVICE_SECRET", "\"${localProperties.getProperty("lifelane.device.secret", "")}\"")
+        buildConfigField("boolean", "MQTT_TLS", localProperties.getProperty("lifelane.mqtt.tls", "false"))
         versionCode = 2
         versionName = "1.2"
         buildConfigField("String", "MQTT_HOST", "\"${localProperties.getProperty("lifelane.mqtt.host", "10.0.2.2")}\"")
@@ -26,6 +28,8 @@ android {
         buildConfigField("String", "MQTT_USERNAME", "\"${localProperties.getProperty("lifelane.mqtt.username", "")}\"")
         buildConfigField("String", "MQTT_PASSWORD", "\"${localProperties.getProperty("lifelane.mqtt.password", "")}\"")
     }
+
+    sourceSets.getByName("main").assets.srcDir(rootProject.file("../shared"))
 
     buildFeatures {
         compose = true
@@ -46,6 +50,8 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.compose.material3:material3")

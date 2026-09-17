@@ -17,7 +17,7 @@ class SignalController:
         self.config = config
         self.event_callback = event_callback or (lambda _event, _reason: None)
         self.state = PreemptionState.NORMAL
-        self.normal_phase = NormalPhase.ALL_RED_BEFORE_NS
+        self.normal_phase = self.initial_normal_phase
         self.signals = {side: SignalColour.RED for side in Approach}
         self.elapsed = 0.0
         self.running = True
@@ -40,7 +40,7 @@ class SignalController:
 
     def reset(self) -> None:
         self.state = PreemptionState.NORMAL
-        self.normal_phase = NormalPhase.ALL_RED_BEFORE_NS
+        self.normal_phase = self.initial_normal_phase
         self.signals = {side: SignalColour.RED for side in Approach}
         self.elapsed = 0.0
         self.running = True
@@ -106,6 +106,15 @@ class SignalController:
 
     def _tick_normal(self) -> None:
         timing = self.config.timing
+        if self.config.timing.get("normal_cycle_mode", "SINGLE") == "SINGLE":
+            phases = [NormalPhase(name) for side in ("NORTH", "EAST", "SOUTH", "WEST")
+                      for name in (f"ALL_RED_BEFORE_{side}", f"{side}_GREEN", f"{side}_YELLOW")]
+            if self.elapsed >= self.normal_phase_duration:
+                self.normal_phase = phases[(phases.index(self.normal_phase)+1) % len(phases)]
+                self.elapsed = 0
+                self._apply_normal_phase()
+                self.event_callback("NORMAL_PHASE", self.normal_phase.value)
+            return
         duration = {
             NormalPhase.NS_GREEN: float(timing["normal_green_seconds"]),
             NormalPhase.NS_YELLOW: float(timing["yellow_seconds"]),
@@ -164,7 +173,7 @@ class SignalController:
                 self._set_state(PreemptionState.RETURN_TO_NORMAL, "Recovery all-red complete")
         elif self.state is PreemptionState.RETURN_TO_NORMAL:
             self.state = PreemptionState.NORMAL
-            self.normal_phase = NormalPhase.ALL_RED_BEFORE_NS
+            self.normal_phase = self.initial_normal_phase
             self._set_all_red()
             self.elapsed = 0.0
             completed_trip = self.target_trip_id
@@ -213,6 +222,13 @@ class SignalController:
 
     def _apply_normal_phase(self) -> None:
         red = {side: SignalColour.RED for side in Approach}
+        if self.config.timing.get("normal_cycle_mode", "SINGLE") == "SINGLE":
+            name = self.normal_phase.value
+            if not name.startswith("ALL_RED"):
+                side, colour = name.split("_")
+                red[Approach(side)] = SignalColour(colour)
+            self.signals = red
+            return
         if self.normal_phase is NormalPhase.NS_GREEN:
             red[Approach.NORTH] = red[Approach.SOUTH] = SignalColour.GREEN
         elif self.normal_phase is NormalPhase.NS_YELLOW:
@@ -235,6 +251,18 @@ class SignalController:
 
     def _check_safety(self) -> None:
         assert_safe(self.signals)
+        if self.config.timing.get("normal_cycle_mode", "SINGLE") == "SINGLE" and sum(c is SignalColour.GREEN for c in self.signals.values()) > 1:
+            raise UnsafeSignalState("single-approach controller rejects multiple greens")
+
+    @property
+    def initial_normal_phase(self):
+        return NormalPhase.ALL_RED_BEFORE_NORTH if self.config.timing.get("normal_cycle_mode", "SINGLE") == "SINGLE" else NormalPhase.ALL_RED_BEFORE_NS
+
+    @property
+    def normal_phase_duration(self):
+        name = self.normal_phase.value
+        field = "all_red_seconds" if name.startswith("ALL_RED") else "yellow_seconds" if name.endswith("YELLOW") else "normal_green_seconds"
+        return float(self.config.timing[field])
 
     def _enter_fail_safe(self, reason: str) -> None:
         previous = self.state

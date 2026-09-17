@@ -106,6 +106,16 @@ def main() -> int:
     from raspberry_pi_app.ui.main_window import MainWindow
 
     config = load_config(args.config)
+    from raspberry_pi_app.communication.local_broker import LocalBroker
+    local_broker = None
+    host = os.getenv("LIFELANE_MQTT_HOST", str(config.mqtt["broker"]))
+    if host in {"localhost", "127.0.0.1"} and not os.getenv("LIFELANE_MQTT_USERNAME") and os.getenv("LIFELANE_MQTT_TLS", "false").lower() not in {"1", "true", "yes"}:
+        candidate = LocalBroker(int(os.getenv("LIFELANE_MQTT_PORT", str(config.mqtt["port"]))))
+        try:
+            if candidate.start():
+                local_broker = candidate
+        except Exception:
+            logging.getLogger("lifelane.windows").exception("Local broker could not start")
     connection = connect_database(args.database)
     repository = Repository(connection, str(config.junction["id"]))
 
@@ -165,7 +175,11 @@ def main() -> int:
 
         QTimer.singleShot(2400, finish_smoke_test)
 
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        if local_broker:
+            local_broker.stop()
 
 
 if __name__ == "__main__":

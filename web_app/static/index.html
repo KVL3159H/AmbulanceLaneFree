@@ -11,40 +11,40 @@
    TOKENS
    ═══════════════════════════════════════════════════════════ */
 :root {
-  --bg:       #05080f;
-  --bg1:      #080d18;
-  --bg2:      #0b1020;
-  --sur:      #0f1526;
-  --sur2:     #141c30;
-  --sur3:     #1a2338;
-  --b0:       rgba(255,255,255,.04);
-  --b1:       rgba(255,255,255,.08);
-  --b2:       rgba(255,255,255,.14);
+  --bg:       #f6f8fc;
+  --bg1:      #ffffff;
+  --bg2:      #eef3f8;
+  --sur:      #ffffff;
+  --sur2:     #f5f8fc;
+  --sur3:     #eaf1ff;
+  --b0:       rgba(20,33,61,.04);
+  --b1:       rgba(20,33,61,.10);
+  --b2:       rgba(20,33,61,.18);
 
-  --teal:     #00e5c3;
-  --teal2:    #00b89c;
-  --teal3:    #007d6a;
-  --red:      #ff4560;
-  --red2:     #cc2240;
-  --amber:    #ffb020;
-  --amber2:   #c8820a;
-  --green:    #00e07a;
-  --green2:   #00a858;
-  --blue:     #4ea8ff;
-  --blue2:    #1e6ec8;
-  --violet:   #a78bff;
-  --white:    #e4eaf8;
-  --white2:   #9aaac8;
-  --muted:    #4a5870;
+  --teal:     #155eef;
+  --teal2:    #155eef;
+  --teal3:    #0b3b8f;
+  --red:      #c4323a;
+  --red2:     #98272e;
+  --amber:    #b54708;
+  --amber2:   #8a3606;
+  --green:    #12805c;
+  --green2:   #0d6045;
+  --blue:     #175cd3;
+  --blue2:    #0b3b8f;
+  --violet:   #6941c6;
+  --white:    #14213d;
+  --white2:   #526076;
+  --muted:    #748197;
 
-  --r-xl: 16px;  --r-lg: 12px;  --r-md: 8px;  --r-sm: 6px;  --r-xs: 4px;
+  --r-xl: 22px;  --r-lg: 16px;  --r-md: 12px;  --r-sm: 10px;  --r-xs: 8px;
   --f: 'Inter', system-ui, sans-serif;
   --m: 'JetBrains Mono', monospace;
 
-  --sh-teal:  0 0 20px rgba(0,229,195,.25);
-  --sh-red:   0 0 20px rgba(255,69,96,.25);
-  --sh-amber: 0 0 20px rgba(255,176,32,.25);
-  --sh-green: 0 0 20px rgba(0,224,122,.25);
+  --sh-teal:  0 8px 24px rgba(21,94,239,.16);
+  --sh-red:   0 8px 24px rgba(196,50,58,.14);
+  --sh-amber: 0 8px 24px rgba(181,71,8,.12);
+  --sh-green: 0 8px 24px rgba(18,128,92,.12);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -74,17 +74,18 @@ body {
 #topbar {
   display: flex; align-items: center; gap: 10px;
   padding: 0 16px;
-  background: rgba(5,8,15,.92);
+  background: rgba(255,255,255,.96);
   border-bottom: 1px solid var(--b1);
   backdrop-filter: blur(24px);
   z-index: 200;
+  box-shadow: 0 1px 0 rgba(20,33,61,.06), 0 8px 24px rgba(20,33,61,.04);
 }
 .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 8px;
   background: linear-gradient(135deg, var(--teal3), var(--teal));
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 900; color: #05080f;
+  font-size: 13px; font-weight: 900; color: #ffffff;
   box-shadow: var(--sh-teal);
   flex-shrink: 0;
 }
@@ -188,7 +189,7 @@ body {
 /* ── PANELS ────────────────────────────────────────────── */
 .panel {
   display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 9px;
+  padding: 14px 12px;
   background: var(--bg1);
   overflow-y: auto;
 }
@@ -205,15 +206,16 @@ body {
   background: var(--sur);
   border: 1px solid var(--b1);
   border-radius: var(--r-lg);
-  padding: 10px 11px;
+  padding: 14px;
   flex-shrink: 0;
+  box-shadow: 0 8px 24px rgba(20,33,61,.055);
 }
 .card-hd {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 8px;
 }
 .card-title {
-  font-size: 8.5px; font-weight: 700; letter-spacing: 1.2px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: var(--muted);
   display: flex; align-items: center; gap: 5px;
 }
@@ -245,12 +247,12 @@ body {
 .sig-label { font-size: 8px; font-weight: 700; color: var(--muted); letter-spacing: .6px; }
 .sig-head {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: #060810; border: 1.5px solid #1a1f30;
+  background: #344054; border: 1.5px solid #253247;
   border-radius: 5px; padding: 5px 4px;
 }
 .sig-lamp {
   width: 16px; height: 16px; border-radius: 50%;
-  background: #0d1020; border: 1px solid #1e2438;
+  background: #667085; border: 1px solid #475467;
   transition: all .12s ease;
 }
 .sig-lamp.R.on { background:#ff2233; box-shadow:0 0 14px #ff223388,0 0 28px #ff223322; }
@@ -260,16 +262,16 @@ body {
 /* ── CONTROL BUTTONS ───────────────────────────────────── */
 .btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
 .btn {
-  padding: 6px 10px; border-radius: var(--r-sm);
+  min-height: 40px; padding: 8px 12px; border-radius: var(--r-sm);
   border: 1px solid var(--b2);
   background: var(--sur2); color: var(--white2);
-  font-family: var(--f); font-size: 10px; font-weight: 700;
+  font-family: var(--f); font-size: 11px; font-weight: 700;
   cursor: pointer; transition: all .18s ease; white-space: nowrap;
   flex: 1;
 }
-.btn:hover { transform: translateY(-1px); filter: brightness(1.25); }
+.btn:hover { transform: translateY(-1px); filter: brightness(.98); border-color: var(--teal); }
 .btn:active { transform: none; filter: brightness(.9); }
-.btn.primary { background:var(--teal2); color:#05080f; border-color:var(--teal); box-shadow:var(--sh-teal); }
+.btn.primary { background:var(--teal2); color:#ffffff; border-color:var(--teal); box-shadow:var(--sh-teal); }
 .btn.danger  { background:rgba(255,69,96,.1); color:var(--red); border-color:rgba(255,69,96,.4); }
 .btn.warn    { background:rgba(255,176,32,.08); color:var(--amber); border-color:rgba(255,176,32,.35); }
 .btn:disabled{ opacity:.3; cursor:not-allowed; transform:none; }
@@ -277,7 +279,7 @@ body {
 /* ── SPAWN GRID ────────────────────────────────────────── */
 .spawn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .spawn-btn {
-  padding: 7px 4px; border-radius: var(--r-sm);
+  min-height: 44px; padding: 8px 4px; border-radius: var(--r-sm);
   border: 1px solid var(--b1); background: var(--sur2);
   color: var(--white2); font-family: var(--f); font-size: 10px; font-weight: 700;
   cursor: pointer; transition: all .18s ease;
@@ -394,12 +396,12 @@ body {
 }
 .ev-row {
   display: flex; gap: 5px; align-items: baseline;
-  padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.02);
+  padding: 4px 0; border-bottom: 1px solid rgba(20,33,61,.06);
 }
 .ev-ts   { font-family:var(--m); font-size:8px; color:var(--muted); flex-shrink:0; }
 .ev-type { font-family:var(--m); font-size:8px; font-weight:700; color:var(--teal); flex-shrink:0; }
 .ev-type.GPS_PACKET { display:none; }
-.ev-msg  { font-size:8px; color:#5a7090; flex:1; word-break:break-word; }
+.ev-msg  { font-size:8px; color:var(--white2); flex:1; word-break:break-word; }
 
 /* ── JUNCTION CANVAS ───────────────────────────────────── */
 #cv-wrap {
@@ -410,7 +412,7 @@ body {
 #jc {
   width: 100%; height: 100%; display: block;
   border-radius: var(--r-xl);
-  box-shadow: 0 0 0 1px rgba(0,229,195,.18), 0 0 50px rgba(0,229,195,.05);
+  box-shadow: 0 0 0 1px rgba(20,33,61,.10), 0 18px 48px rgba(20,33,61,.10);
 }
 #cv-badge {
   position: absolute; top: 8px; right: 8px;
@@ -457,6 +459,19 @@ body {
 @media (max-width: 900px) {
   #main { grid-template-columns: 1fr; overflow-y: auto; }
   body, #app { overflow: auto; }
+  #app { grid-template-rows: auto auto auto; min-height: 100vh; height: auto; }
+  #topbar { min-height: 64px; flex-wrap: wrap; padding: 10px 14px; }
+  #tb-pipe { order: 3; width: 100%; justify-content: center; overflow-x: auto; }
+  #center-panel { order: -1; min-height: 440px; padding: 18px 10px; }
+  #left-panel, #right-panel { border: 0; }
+  #cv-wrap { width: min(92vw, 520px); }
+  .panel { padding: 12px; }
+}
+@media (max-width: 520px) {
+  .tb-label, .brand-sub { display: none; }
+  .pipe-step { font-size: 8px; padding: 4px; }
+  #center-panel { min-height: 380px; }
+  .card { padding: 14px; }
 }
 </style>
 </head>
@@ -1191,7 +1206,7 @@ function drawAmbulance(x,y,prio,label,isTarget){
   cx.font='700 8px JetBrains Mono,monospace';
   cx.textAlign='center'; cx.textBaseline='top';
   var tw=cx.measureText(label).width+6;
-  cx.fillStyle='rgba(5,8,15,.82)';
+  cx.fillStyle='rgba(255,255,255,.94)';
   rrect(cx,x-tw/2,y+10,tw,11,2); cx.fill();
   cx.fillStyle=ac; cx.fillText(label,x,y+11);
 }
@@ -1208,7 +1223,7 @@ function ambPos(a){
 
 function drawZebra(x1,y1,x2,y2,horiz){
   var stripes=4, sw=3;
-  cx.save(); cx.strokeStyle='rgba(255,255,255,.18)'; cx.lineWidth=sw;
+  cx.save(); cx.strokeStyle='rgba(20,33,61,.18)'; cx.lineWidth=sw;
   for(var i=0;i<stripes;i++){
     var t=i/stripes;
     var nx=x1+(x2-x1)*t, ny=y1+(y2-y1)*t;
@@ -1225,7 +1240,7 @@ function drawFrame(){
   var h=RW/2;
 
   // ── BACKGROUND ───────────────────────────────────────────
-  cx.fillStyle='#06090f'; cx.fillRect(0,0,SZ,SZ);
+  cx.fillStyle='#eef3f8'; cx.fillRect(0,0,SZ,SZ);
 
   // Pavement blocks with slight texture
   var blocks=[
@@ -1233,7 +1248,7 @@ function drawFrame(){
     [0,CY+h,CX-h,CY-h], [CX+h,CY+h,CX-h,CY-h]
   ];
   blocks.forEach(function(b){
-    cx.fillStyle='#0a0f1c'; cx.fillRect(b[0],b[1],b[2],b[3]);
+    cx.fillStyle='#e2e8f0'; cx.fillRect(b[0],b[1],b[2],b[3]);
     // grid lines
     cx.strokeStyle='rgba(255,255,255,.015)'; cx.lineWidth=1;
     for(var gx=b[0];gx<b[0]+b[2];gx+=20){
@@ -1245,12 +1260,12 @@ function drawFrame(){
   });
 
   // ── ROADS ────────────────────────────────────────────────
-  cx.fillStyle='#0e1420';
+  cx.fillStyle='#cbd5e1';
   cx.fillRect(CX-h, 0,   RW, SZ);  // N-S
   cx.fillRect(0,   CY-h, SZ, RW);  // E-W
 
   // Junction box
-  cx.fillStyle='#0b111f'; cx.fillRect(CX-h,CY-h,RW,RW);
+  cx.fillStyle='#cbd5e1'; cx.fillRect(CX-h,CY-h,RW,RW);
 
   // ── RADAR RINGS ──────────────────────────────────────────
   function ring(r,fillA,strokeA,dash){
@@ -1270,7 +1285,7 @@ function drawFrame(){
   cx.fillText('50m', CX+50*SC+3, CY-4);
 
   // ── LANE MARKINGS ────────────────────────────────────────
-  cx.strokeStyle='rgba(255,255,255,.35)'; cx.lineWidth=1.5; cx.setLineDash([12,10]);
+  cx.strokeStyle='rgba(255,255,255,.92)'; cx.lineWidth=1.5; cx.setLineDash([12,10]);
   // N-S centre line
   cx.beginPath();cx.moveTo(CX,0);cx.lineTo(CX,CY-h); cx.stroke();
   cx.beginPath();cx.moveTo(CX,CY+h);cx.lineTo(CX,SZ); cx.stroke();
@@ -1293,7 +1308,7 @@ function drawFrame(){
   drawZebra(CX-h-10,CY-h+4,CX-h-10,CY+h-4,true);
 
   // ── JUNCTION BOX ARROWS ──────────────────────────────────
-  cx.fillStyle='rgba(255,255,255,.07)';
+  cx.fillStyle='rgba(20,33,61,.08)';
   cx.font='bold 13px Arial'; cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText('↕',CX,CY-4);  // N-S
   cx.fillText('↔',CX,CY+4);  // E-W (overlapping trick)
@@ -1312,7 +1327,7 @@ function drawFrame(){
   drawSigHead(CX-so, CY+so, sig('WEST'));
 
   // ── COMPASS ──────────────────────────────────────────────
-  cx.fillStyle='rgba(255,255,255,.22)'; cx.font='700 10px Inter,sans-serif';
+  cx.fillStyle='rgba(20,33,61,.58)'; cx.font='700 10px Inter,sans-serif';
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText('N',CX,11); cx.fillText('S',CX,SZ-11);
   cx.fillText('E',SZ-11,CY); cx.fillText('W',11,CY);

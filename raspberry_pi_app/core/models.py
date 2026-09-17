@@ -8,11 +8,7 @@ from enum import Enum
 from typing import Any
 
 
-class Approach(str, Enum):
-    NORTH = "NORTH"
-    SOUTH = "SOUTH"
-    EAST = "EAST"
-    WEST = "WEST"
+from .protocol import Approach
 
 
 class PatientPriority(str, Enum):
@@ -67,6 +63,14 @@ class TelemetryPacket:
     destination_hospital: str
     emergency_active: bool
     timestamp: datetime
+    request_id: str = ""
+    destination_hospital_id: str = ""
+    destination_latitude: float | None = None
+    destination_longitude: float | None = None
+    route_distance_metres: float | None = None
+    route_eta_seconds: float | None = None
+    upcoming_junction_id: str = ""
+    supported_junction_count: int = 0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TelemetryPacket":
@@ -85,6 +89,14 @@ class TelemetryPacket:
             destination_hospital=str(data["destinationHospital"]).strip(),
             emergency_active=bool(data["emergencyActive"]),
             timestamp=parse_timestamp(data["timestamp"]),
+            request_id=str(data.get("requestId", "")).strip(),
+            destination_hospital_id=str(data.get("destinationHospitalId", "")).strip(),
+            destination_latitude=float(data["destinationLatitude"]) if data.get("destinationLatitude") is not None else None,
+            destination_longitude=float(data["destinationLongitude"]) if data.get("destinationLongitude") is not None else None,
+            route_distance_metres=float(data["routeDistanceMetres"]) if data.get("routeDistanceMetres") is not None else None,
+            route_eta_seconds=float(data["routeEtaSeconds"]) if data.get("routeEtaSeconds") is not None else None,
+            upcoming_junction_id=str(data.get("upcomingJunctionId", "")).strip(),
+            supported_junction_count=max(0, int(data.get("supportedJunctionCount", 0))),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -98,11 +110,20 @@ class TelemetryPacket:
             "accuracyMetres": self.accuracy_metres,
             "speedMps": self.speed_mps,
             "headingDegrees": self.heading_degrees,
+            "travelHeading": self.heading_degrees,
             "patientPriority": self.patient_priority.value,
             "patientCondition": self.patient_condition,
             "destinationHospital": self.destination_hospital,
             "emergencyActive": self.emergency_active,
             "timestamp": self.timestamp.isoformat().replace("+00:00", "Z"),
+            "requestId": self.request_id,
+            "destinationHospitalId": self.destination_hospital_id,
+            "destinationLatitude": self.destination_latitude,
+            "destinationLongitude": self.destination_longitude,
+            "routeDistanceMetres": self.route_distance_metres,
+            "routeEtaSeconds": self.route_eta_seconds,
+            "upcomingJunctionId": self.upcoming_junction_id,
+            "supportedJunctionCount": self.supported_junction_count,
         }
 
 
@@ -119,6 +140,11 @@ class GPSAssessment:
     approaching: bool = False
     eta_seconds: float | None = None
     filtered_speed_mps: float = 0.0
+    approach_confidence: float = 0.0
+    signed_stop_distance: float | None = None
+    after_exit_metres: float | None = None
+    inside_polygon: bool = False
+    route_distance_metres: float | None = None
 
 
 @dataclass

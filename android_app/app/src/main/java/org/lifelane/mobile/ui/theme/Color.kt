@@ -2,62 +2,79 @@ package org.lifelane.mobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// =========================================================================
-// WhatsApp Brand Design Tokens
-// =========================================================================
+// LifeLane Civic Intelligence — light-only product palette.
+val Canvas = Color(0xFFF6F8FC)
+val Surface = Color(0xFFFFFFFF)
+val SurfaceSoft = Color(0xFFEEF3F8)
+val PrimaryBlue = Color(0xFF155EEF)
+val PrimaryBlueDeep = Color(0xFF0B3B8F)
+val PrimaryBlueSoft = Color(0xFFEAF1FF)
+val MobilityTeal = Color(0xFF087F8C)
+val MobilityTealSoft = Color(0xFFE7F6F7)
+val TextPrimary = Color(0xFF14213D)
+val TextSecondary = Color(0xFF526076)
+val TextMuted = Color(0xFF748197)
+val Border = Color(0xFFD8E1EC)
 
-// WhatsApp Light Palette
-val WhatsAppTealGreen = Color(0xFF008069)          // Modern WhatsApp AppBar & primary brand
-val WhatsAppDeepTeal = Color(0xFF075E54)           // Classic WhatsApp deep forest teal
-val WhatsAppVibrantGreen = Color(0xFF25D366)       // Action buttons, FAB, badges, online status
-val WhatsAppBackgroundLight = Color(0xFFEFEAE2)    // WhatsApp chat doodle soft warm background
-val WhatsAppSurfaceLight = Color(0xFFFFFFFF)       // WhatsApp incoming bubble / clean surface
-val WhatsAppElevatedLight = Color(0xFFF0F2F5)      // WhatsApp elevated surfaces & side panels
-val WhatsAppBorderLight = Color(0xFFE9EDEF)        // WhatsApp subtle borders & dividers
-val WhatsAppTextPrimaryLight = Color(0xFF111B21)   // WhatsApp high-contrast dark text
-val WhatsAppTextSecondaryLight = Color(0xFF667781) // WhatsApp timestamps & subtitle text
-val WhatsAppTextMutedLight = Color(0xFF8696A0)     // WhatsApp muted metadata
-val WhatsAppBubbleOutgoingLight = Color(0xFFD9FDD3)// WhatsApp signature outgoing bubble green
-val WhatsAppBubbleIncomingLight = Color(0xFFFFFFFF)// WhatsApp incoming bubble white
-val WhatsAppBlueTick = Color(0xFF53BDEB)           // WhatsApp double checkmark blue
-val WhatsAppSecurityGold = Color(0xFFFFF3C4)       // WhatsApp end-to-end encryption card
-val WhatsAppSecurityText = Color(0xFF5E4500)       // WhatsApp encryption message text
+val EmergencyRed = Color(0xFFC4323A)
+val WarningAmber = Color(0xFFB54708)
+val ActiveGreen = Color(0xFF12805C)
+val InformationBlue = Color(0xFF175CD3)
+val DisabledGrey = Color(0xFF98A5B8)
+val LampOff = Color(0xFF344054)
 
-// WhatsApp Dark Palette
-val WhatsAppBackgroundDark = Color(0xFF0B141A)     // WhatsApp dark mode AMOLED background
-val WhatsAppSurfaceDark = Color(0xFF1F2C34)        // WhatsApp dark incoming bubble / card
-val WhatsAppElevatedDark = Color(0xFF202C33)       // WhatsApp dark top bar & elevated card
-val WhatsAppBorderDark = Color(0xFF2A3942)         // WhatsApp dark divider & card border
-val WhatsAppTextPrimaryDark = Color(0xFFE9EDEF)    // WhatsApp dark high-contrast text
-val WhatsAppTextSecondaryDark = Color(0xFF8696A0)  // WhatsApp dark secondary text
-val WhatsAppTextMutedDark = Color(0xFF667781)      // WhatsApp dark muted text
-val WhatsAppBubbleOutgoingDark = Color(0xFF005C4B) // WhatsApp dark outgoing bubble green
-val WhatsAppBubbleIncomingDark = Color(0xFF1F2C34) // WhatsApp dark incoming bubble
-val WhatsAppAccentGreenDark = Color(0xFF00A884)    // WhatsApp dark mode teal accent
+val PrimaryTeal = PrimaryBlue
+val PrimaryHover = PrimaryBlueDeep
+val BackgroundLight = Canvas
+val SurfaceLight = Surface
+val ElevatedLight = SurfaceSoft
+val BorderLight = Border
+val TextPrimaryLight = TextPrimary
+val TextSecondaryLight = TextSecondary
+val AccentColor = MobilityTeal
 
-// Status & Severity Colors (WhatsApp style)
-val EmergencyRed = Color(0xFFEA0038)               // WhatsApp call-decline vibrant red
-val WarningAmber = Color(0xFFF5A623)               // WhatsApp warning amber
-val ActiveGreen = Color(0xFF25D366)                // WhatsApp verified / delivered green
-val InformationBlue = Color(0xFF34B7F1)            // WhatsApp link / info blue
-val DisabledGrey = Color(0xFF8696A0)
-val LampOff = Color(0xFF1E293B)
+val DarkCanvas = Color(0xFF07111F)
+val DarkSurface = Color(0xFF111C2E)
+val DarkRaised = Color(0xFF172337)
+val DarkTextPrimary = Color(0xFFF8FAFC)
+val DarkTextSecondary = Color(0xFF94A3B8)
+val DarkBorder = Color(0xFF293548)
+val DarkNavigationBlue = Color(0xFF60A5FA)
+val DarkMedicalTeal = Color(0xFF2DD4BF)
+val DarkCriticalRed = Color(0xFFF87171)
+val DarkWarningAmber = Color(0xFFFBBF24)
 
-// Aliases for compatibility
-val PrimaryTeal = WhatsAppTealGreen
-val PrimaryHover = Color(0xFF00A884)
-val BackgroundDark = WhatsAppBackgroundDark
-val NavigationDark = WhatsAppElevatedDark
-val SurfaceDark = WhatsAppSurfaceDark
-val ElevatedDark = WhatsAppElevatedDark
-val BorderDark = WhatsAppBorderDark
-val TextPrimaryDark = WhatsAppTextPrimaryDark
-val TextSecondaryDark = WhatsAppTextSecondaryDark
-val TextMutedDark = WhatsAppTextMutedDark
-
-val BackgroundLight = WhatsAppBackgroundLight
-val SurfaceLight = WhatsAppSurfaceLight
-val ElevatedLight = WhatsAppElevatedLight
-val BorderLight = WhatsAppBorderLight
-val TextPrimaryLight = WhatsAppTextPrimaryLight
-val TextSecondaryLight = WhatsAppTextSecondaryLight
+// Compatibility names retain source stability while resolving exclusively to light tokens.
+val WhatsAppTealGreen = PrimaryBlue
+val WhatsAppDeepTeal = PrimaryBlueDeep
+val WhatsAppVibrantGreen = PrimaryBlue
+val WhatsAppBackgroundLight = Canvas
+val WhatsAppSurfaceLight = Surface
+val WhatsAppElevatedLight = SurfaceSoft
+val WhatsAppBorderLight = Border
+val WhatsAppTextPrimaryLight = TextPrimary
+val WhatsAppTextSecondaryLight = TextSecondary
+val WhatsAppTextMutedLight = TextMuted
+val WhatsAppBubbleOutgoingLight = PrimaryBlueSoft
+val WhatsAppBubbleIncomingLight = Surface
+val WhatsAppBlueTick = MobilityTeal
+val WhatsAppSecurityGold = Color(0xFFF0F7FF)
+val WhatsAppSecurityText = PrimaryBlueDeep
+val WhatsAppBackgroundDark = DarkCanvas
+val WhatsAppSurfaceDark = DarkSurface
+val WhatsAppElevatedDark = DarkRaised
+val WhatsAppBorderDark = DarkBorder
+val WhatsAppTextPrimaryDark = DarkTextPrimary
+val WhatsAppTextSecondaryDark = DarkTextSecondary
+val WhatsAppTextMutedDark = DarkTextSecondary
+val WhatsAppBubbleOutgoingDark = Color(0xFF173A66)
+val WhatsAppBubbleIncomingDark = DarkSurface
+val WhatsAppAccentGreenDark = DarkNavigationBlue
+val BackgroundDark = DarkCanvas
+val NavigationDark = DarkSurface
+val SurfaceDark = DarkSurface
+val ElevatedDark = DarkRaised
+val BorderDark = DarkBorder
+val TextPrimaryDark = DarkTextPrimary
+val TextSecondaryDark = DarkTextSecondary
+val TextMutedDark = DarkTextSecondary

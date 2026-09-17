@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Emergency Way laboratory junction configuration",
+  "type": "object",
+  "required": [
+    "junction",
+    "detection",
+    "timing",
+    "mqtt",
+    "geometry",
+    "gpio",
+    "security"
+  ],
+  "properties": {
+    "junction": {
+      "type": "object",
+      "required": [
+        "id",
+        "controller_id",
+        "name",
+        "latitude",
+        "longitude"
+      ]
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "polygon",
+        "paths",
+        "stop_progress",
+        "exit_progress",
+        "inbound_bearings",
+        "outbound_bearings",
+        "supported_movements"
+      ]
+    },
+    "timing": {
+      "type": "object",
+      "required": [
+        "normal_green_seconds",
+        "minimum_green_seconds",
+        "yellow_seconds",
+        "all_red_seconds",
+        "maximum_ambulance_green_seconds"
+      ]
+    },
+    "gpio": {
+      "type": "object",
+      "required": [
+        "pins"
+      ]
+    }
+  }
+}

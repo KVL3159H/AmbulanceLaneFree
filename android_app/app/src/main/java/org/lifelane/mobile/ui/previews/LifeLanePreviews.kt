@@ -1,6 +1,5 @@
 package org.lifelane.mobile.ui.previews
 
-import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +27,8 @@ private val previewStages = listOf(
 )
 
 @Composable
-private fun ActiveRoutePreview(darkTheme: Boolean, landscape: Boolean = false) {
-    LifeLaneTheme(darkTheme = darkTheme) {
+private fun ActiveRoutePreview(landscape: Boolean = false) {
+    LifeLaneTheme {
         Surface(Modifier.fillMaxSize()) {
             if (landscape) {
                 Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -66,18 +65,14 @@ private fun PreviewSummary(modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(name = "Active route — dark portrait", widthDp = 412, heightDp = 915, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true)
+@Preview(name = "Active route — light portrait", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
-private fun DarkPortraitPreview() = ActiveRoutePreview(darkTheme = true)
+private fun LightPortraitPreview() = ActiveRoutePreview()
 
-@Preview(name = "Active route — light portrait", widthDp = 412, heightDp = 915, uiMode = Configuration.UI_MODE_NIGHT_NO, showBackground = true)
+@Preview(name = "Active route — light landscape", widthDp = 915, heightDp = 412, showBackground = true)
 @Composable
-private fun LightPortraitPreview() = ActiveRoutePreview(darkTheme = false)
+private fun LandscapePreview() = ActiveRoutePreview(landscape = true)
 
-@Preview(name = "Active route — landscape", widthDp = 915, heightDp = 412, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true)
+@Preview(name = "Active route — 150% font", widthDp = 412, heightDp = 915, fontScale = 1.5f, showBackground = true)
 @Composable
-private fun LandscapePreview() = ActiveRoutePreview(darkTheme = true, landscape = true)
-
-@Preview(name = "Active route — 150% font", widthDp = 412, heightDp = 915, fontScale = 1.5f, uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true)
-@Composable
-private fun LargeFontPreview() = ActiveRoutePreview(darkTheme = true)
+private fun LargeFontPreview() = ActiveRoutePreview()

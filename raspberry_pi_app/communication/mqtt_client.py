@@ -101,14 +101,21 @@ class MQTTClient:
             qos=1,
         )
 
-    def publish_request(self, ambulance_id: str, trip_id: str, status: str) -> None:
+    def publish_request(
+        self, ambulance_id: str, trip_id: str, status: str,
+        request_id: str = "", approach: str = "", controller_state: str = "",
+        reason: str = "",
+    ) -> None:
         prefix = str(self.config.mqtt["topic_prefix"])
         junction_id = str(self.config.junction["id"])
         self.client.publish(
             junction_request(prefix, junction_id),
             json.dumps({
                 "schemaVersion": 1, "junctionId": junction_id,
-                "ambulanceId": ambulance_id, "tripId": trip_id, "status": status,
+                "requestId": request_id, "ambulanceId": ambulance_id, "tripId": trip_id,
+                "status": status, "accepted": status not in {"REJECTED", "CANCELLED"},
+                "grantedDirection": approach, "controllerState": controller_state,
+                "reason": reason,
                 "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }),
             qos=1,

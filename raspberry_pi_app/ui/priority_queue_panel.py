@@ -54,3 +54,15 @@ class PriorityQueuePanel(QFrame):
         row = self.table.currentRow()
         item = self.table.item(row, 0) if row >= 0 else None
         return str(item.data(Qt.ItemDataRole.UserRole)) if item else None
+
+    def update_hardware(self, acknowledgements):
+        rows=sorted((ack for ack in acknowledgements if ack.get("accepted") and ack.get("queuePosition",0)>0),key=lambda ack:ack["queuePosition"])
+        self.stack.setCurrentWidget(self.table if rows else self.empty)
+        self.table.setRowCount(len(rows))
+        for index,ack in enumerate(rows):
+            request=ack.get("matchedRequest") or {}
+            values=[ack["queuePosition"],ack["ambulanceId"],request.get("approachSide","Unknown"),request.get("medicalPriority","Unknown"),
+                    request.get("distanceToStopLine","Unavailable"),request.get("junctionEtaSeconds","Unavailable"),"Pi queue"]
+            for column,value in enumerate(values):
+                item=QTableWidgetItem(str(value)); item.setData(Qt.ItemDataRole.UserRole,ack["tripId"])
+                self.table.setItem(index,column,item)

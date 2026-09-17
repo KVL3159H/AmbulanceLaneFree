@@ -16,11 +16,6 @@ import sys
 from typing import Dict, List, Optional, Set, Tuple
 
 # Set up clean logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
 logger = logging.getLogger("lifelane.broker")
 
 # MQTT Packet Types
@@ -447,6 +442,7 @@ async def run_broker(host: str = "0.0.0.0", port: int = 1883):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
     try:
         asyncio.run(run_broker())
     except KeyboardInterrupt:
