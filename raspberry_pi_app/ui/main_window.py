@@ -1169,15 +1169,18 @@ class MainWindow(QMainWindow):
                 "signalState": ",".join(f"{side.value}:{colour.value}" for side, colour in self.coordinator.controller.signals.items()),
 
                 "selectedAmbulance": selected.ambulance_id if selected else "", "requestStatus": selected.status.value if selected else "NONE"})
-
-        self.scene.update_signals(self.coordinator.controller.signals); self._refresh_panels()
+        ctrl = self.coordinator.controller
+        self.scene.update_signals(ctrl.signals)
+        self.scene.update_traffic(step, ctrl.signals, ctrl.state, ctrl.target_approach)
+        self._refresh_panels()
         if self.stop_at_all_red and self.coordinator.controller.state is PreemptionState.NORMAL and all(c is SignalColour.RED for c in self.coordinator.controller.signals.values()):
-            self.stop_at_all_red=False; self.pause_simulation()
-            self._on_event("SIMULATION_STOPPED","Stopped with every approach red")
-        self.metrics_page.refresh(self.traffic,self.structured_log)
-        controller = self.coordinator.controller
-        self.controller_details.setText(f"SIMULATION controller | {controller.state.value} | {controller.normal_phase.value} | {controller.elapsed:.1f}s | MQTT: {self.mqtt_state}")
-
+            self.stop_at_all_red = False
+            self.pause_simulation()
+            self._on_event("SIMULATION_STOPPED", "Stopped with every approach red")
+        if hasattr(self, "metrics_page") and hasattr(self, "traffic") and hasattr(self, "structured_log"):
+            self.metrics_page.refresh(self.traffic, self.structured_log)
+        if hasattr(self, "controller_details"):
+            self.controller_details.setText(f"SIMULATION controller | {ctrl.state.value} | {ctrl.normal_phase.value} | {ctrl.elapsed:.1f}s | MQTT: {self.mqtt_state}")
         if self.health_elapsed >= 1.0:
 
             self.health_elapsed = 0.0

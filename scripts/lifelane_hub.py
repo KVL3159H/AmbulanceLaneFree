@@ -67,7 +67,7 @@ def is_port_in_use(port: int = 1883) -> bool:
 def action_run_desktop():
     print(f"\n{BOLD}{CYAN}>>> Launching LifeLane Desktop Simulator...{RESET}\n")
     py = get_python_exe()
-    cmd = [py, "-m", "windows_app.main"]
+    cmd = [py, "-m", "raspberry_pi_app.main"]
     subprocess.run(cmd, cwd=PROJECT_ROOT)
 
 

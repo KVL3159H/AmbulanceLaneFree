@@ -27,7 +27,7 @@ if "%PY_CMD%"=="" (
 )
 
 echo [INFO] Starting desktop simulator...
-"%PY_CMD%" -m windows_app.main %*
+"%PY_CMD%" -m raspberry_pi_app.main %*
 if %ERRORLEVEL% neq 0 (
     echo.
     echo [ERROR] Application exited with error code %ERRORLEVEL%.

@@ -672,6 +672,25 @@ body {
               onclick="apiAction('/api/simulate/clear',null,'All ambulances cleared')">✕ Clear All</button>
     </div>
 
+    <!-- Civilian Traffic & Preemption Reaction Control -->
+    <div class="card" id="traffic-ctrl-card">
+      <div class="card-hd">
+        <div class="card-title"><div class="ct-dot"></div>City Traffic Control</div>
+        <div class="card-badge live" id="traffic-badge">Active (12)</div>
+      </div>
+      <div style="font-size:8px;color:var(--muted);margin-bottom:6px;line-height:1.3">
+        Vehicles obey alternating signals (NS/EW) & pull to the shoulder when an ambulance approaches to clear the lane.
+      </div>
+      <div class="prio-row" style="margin-bottom:6px">
+        <button class="prio-pill GREEN on" id="tf-dense"  onclick="setTrafficDensity('dense')">HEAVY</button>
+        <button class="prio-pill YELLOW"    id="tf-medium" onclick="setTrafficDensity('medium')">NORMAL</button>
+        <button class="prio-pill RED"       id="tf-off"    onclick="setTrafficDensity('off')">OFF</button>
+      </div>
+      <div id="traffic-status-banner" style="font-size:8.5px;padding:4px 8px;border-radius:6px;background:rgba(0,229,195,.08);color:var(--teal);border:1px solid rgba(0,229,195,.2);text-align:center;font-weight:700">
+        🟢 Alternating Normal Cycle
+      </div>
+    </div>
+
     <!-- On-Track Units -->
     <div class="card" id="units-card" style="display:none">
       <div class="card-hd">
@@ -1235,6 +1254,383 @@ function drawZebra(x1,y1,x2,y2,horiz){
   cx.restore();
 }
 
+// ── CIVILIAN TRAFFIC SIMULATION (SIGNAL COMPLIANCE + AMBULANCE LANE FREE) ──
+var trafficDensity = 'dense';
+var trafficCars = [];
+var lastTrafficTime = performance.now();
+var CAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b', '#e2e8f0', '#06b6d4', '#f97316'];
+var CAR_SHAPES = [
+  {type:'sedan', len:20, wid:11},
+  {type:'suv', len:22, wid:12},
+  {type:'compact', len:17, wid:10},
+  {type:'van', len:24, wid:12}
+];
+
+function setTrafficDensity(mode){
+  trafficDensity = mode;
+  ['dense','medium','off'].forEach(function(m){
+    var el = document.getElementById('tf-' + m);
+    if(el) el.classList.toggle('on', m === mode);
+  });
+  var count = (mode === 'dense') ? 12 : (mode === 'medium') ? 8 : 0;
+  initTraffic(count);
+  toast('Traffic: ' + mode.toUpperCase() + ' (' + count + ' vehicles)');
+}
+
+function initTraffic(count){
+  trafficCars = [];
+  if(count <= 0) return;
+  var sides = ['NORTH','SOUTH','EAST','WEST'];
+  var perSide = Math.ceil(count / 4);
+  var idCounter = 1;
+  sides.forEach(function(side){
+    for(var i = 0; i < perSide; i++){
+      if(trafficCars.length >= count) break;
+      var shape = CAR_SHAPES[(idCounter - 1) % CAR_SHAPES.length];
+      var col = CAR_COLORS[(idCounter - 1) % CAR_COLORS.length];
+      var isInc = (side === 'NORTH' || side === 'WEST');
+      var startPos = isInc ? (-30 + i * 110) : (SZ + 30 - i * 110);
+      trafficCars.push({
+        id: 'C' + idCounter++,
+        side: side,
+        pos: startPos,
+        speed: 38 + (i % 3) * 6,
+        currSpeed: 38,
+        len: shape.len,
+        wid: shape.wid,
+        type: shape.type,
+        color: col,
+        yieldOffset: 0,
+        targetYieldOffset: 0,
+        isYielding: false,
+        isBraking: false,
+        hazardBlink: false,
+        blinkTimer: 0
+      });
+    }
+  });
+}
+
+function drawCivilianCar(c, laneIn){
+  var x, y, angle;
+  if(c.side === 'NORTH'){
+    x = CX - laneIn - c.yieldOffset;
+    y = c.pos;
+    angle = Math.PI / 2;
+  } else if(c.side === 'SOUTH'){
+    x = CX + laneIn + c.yieldOffset;
+    y = c.pos;
+    angle = -Math.PI / 2;
+  } else if(c.side === 'EAST'){
+    x = c.pos;
+    y = CY - laneIn - c.yieldOffset;
+    angle = Math.PI;
+  } else {
+    x = c.pos;
+    y = CY + laneIn + c.yieldOffset;
+    angle = 0;
+  }
+
+  cx.save();
+  cx.translate(x, y);
+  cx.rotate(angle);
+
+  var halfL = c.len / 2;
+  var halfW = c.wid / 2;
+
+  // Headlight beam
+  if(c.currSpeed > 1){
+    cx.save();
+    var hg = cx.createRadialGradient(halfL, 0, 2, halfL + 18, 0, 24);
+    hg.addColorStop(0, 'rgba(255, 255, 200, 0.26)');
+    hg.addColorStop(1, 'rgba(255, 255, 200, 0)');
+    cx.fillStyle = hg;
+    cx.beginPath();
+    cx.moveTo(halfL, -halfW + 2);
+    cx.lineTo(halfL + 20, -halfW - 5);
+    cx.lineTo(halfL + 20, halfW + 5);
+    cx.lineTo(halfL, halfW - 2);
+    cx.closePath();
+    cx.fill();
+    cx.restore();
+  }
+
+  // Car body
+  cx.fillStyle = c.color;
+  cx.strokeStyle = 'rgba(0,0,0,0.45)';
+  cx.lineWidth = 1;
+  rrect(cx, -halfL, -halfW, c.len, c.wid, 2.5);
+  cx.fill();
+  cx.stroke();
+
+  // Roof & windshield
+  var roofL = c.len * 0.52;
+  var roofW = c.wid * 0.76;
+  cx.fillStyle = '#0f172a';
+  rrect(cx, -roofL / 2 - 1, -roofW / 2, roofL, roofW, 1.5);
+  cx.fill();
+
+  // Windshield glass
+  cx.fillStyle = 'rgba(147, 197, 253, 0.7)';
+  cx.fillRect(roofL / 2 - 3, -roofW / 2 + 1, 2.5, roofW - 2);
+  cx.fillStyle = 'rgba(147, 197, 253, 0.4)';
+  cx.fillRect(-roofL / 2, -roofW / 2 + 1, 2, roofW - 2);
+
+  // Headlights
+  cx.fillStyle = '#fffbeb';
+  cx.fillRect(halfL - 1.5, -halfW + 1.5, 1.5, 2);
+  cx.fillRect(halfL - 1.5, halfW - 3.5, 1.5, 2);
+
+  // Tail / Brake lights
+  if(c.isBraking || c.currSpeed < 2){
+    cx.fillStyle = '#ff1744';
+    cx.shadowColor = 'rgba(255, 23, 68, 0.9)';
+    cx.shadowBlur = 8;
+  } else {
+    cx.fillStyle = '#b91c1c';
+    cx.shadowBlur = 0;
+  }
+  cx.fillRect(-halfL, -halfW + 1.5, 2, 2.5);
+  cx.fillRect(-halfL, halfW - 4, 2, 2.5);
+  cx.shadowBlur = 0;
+
+  // Blinking hazard lights when yielding for ambulance
+  if(c.isYielding && c.hazardBlink){
+    cx.fillStyle = '#ffb020';
+    cx.shadowColor = 'rgba(255, 176, 32, 0.95)';
+    cx.shadowBlur = 8;
+    cx.fillRect(halfL - 2, -halfW - 1, 2, 2);
+    cx.fillRect(halfL - 2, halfW - 1, 2, 2);
+    cx.fillRect(-halfL, -halfW - 1, 2, 2);
+    cx.fillRect(-halfL, halfW - 1, 2, 2);
+    cx.shadowBlur = 0;
+  }
+
+  cx.restore();
+
+  // Yielding text indicator
+  if(c.isYielding && c.currSpeed < 4){
+    cx.save();
+    cx.font = '700 7px JetBrains Mono, monospace';
+    cx.textAlign = 'center';
+    cx.fillStyle = 'rgba(255, 176, 32, 0.95)';
+    cx.fillText('YIELD', x, y - 9);
+    cx.restore();
+  }
+}
+
+function drawEmergencyCorridor(side){
+  var h = RW / 2;
+  var t = performance.now();
+  var pulse = 0.5 + 0.5 * Math.sin(t / 180);
+
+  cx.save();
+  // Cleared corridor background & border
+  cx.fillStyle = 'rgba(0, 229, 195, ' + (0.07 + 0.05 * pulse) + ')';
+  cx.strokeStyle = 'rgba(0, 229, 195, ' + (0.4 + 0.3 * pulse) + ')';
+  cx.lineWidth = 2;
+  cx.setLineDash([8, 6]);
+
+  var arrowPts = [];
+  if(side === 'NORTH'){
+    cx.fillRect(CX - 18, 0, 36, CY + h);
+    cx.strokeRect(CX - 18, 0, 36, CY + h);
+    for(var y = 40; y < CY; y += 45) arrowPts.push({x: CX, y: (y + (t * 0.06) % 45), rot: Math.PI / 2});
+  } else if(side === 'SOUTH'){
+    cx.fillRect(CX - 18, CY - h, 36, SZ - (CY - h));
+    cx.strokeRect(CX - 18, CY - h, 36, SZ - (CY - h));
+    for(var y = SZ - 40; y > CY; y -= 45) arrowPts.push({x: CX, y: (y - (t * 0.06) % 45), rot: -Math.PI / 2});
+  } else if(side === 'EAST'){
+    cx.fillRect(CX - h, CY - 18, SZ - (CX - h), 36);
+    cx.strokeRect(CX - h, CY - 18, SZ - (CX - h), 36);
+    for(var x = SZ - 40; x > CX; x -= 45) arrowPts.push({x: (x - (t * 0.06) % 45), y: CY, rot: Math.PI});
+  } else {
+    cx.fillRect(0, CY - 18, CX + h, 36);
+    cx.strokeRect(0, CY - 18, CX + h, 36);
+    for(var x = 40; x < CX; x += 45) arrowPts.push({x: (x + (t * 0.06) % 45), y: CY, rot: 0});
+  }
+  cx.setLineDash([]);
+
+  // Animated clearance chevrons
+  cx.fillStyle = 'rgba(0, 229, 195, ' + (0.6 + 0.4 * pulse) + ')';
+  arrowPts.forEach(function(p){
+    cx.save();
+    cx.translate(p.x, p.y);
+    cx.rotate(p.rot);
+    cx.beginPath();
+    cx.moveTo(-6, -6);
+    cx.lineTo(5, 0);
+    cx.lineTo(-6, 6);
+    cx.lineTo(-3, 0);
+    cx.closePath();
+    cx.fill();
+    cx.restore();
+  });
+  cx.restore();
+
+  // Top canvas operational banner
+  cx.save();
+  var bannerW = 340, bannerH = 20;
+  var bx = CX - bannerW / 2, by = 8;
+  rrect(cx, bx, by, bannerW, bannerH, 10);
+  cx.fillStyle = 'rgba(5, 12, 24, 0.92)';
+  cx.fill();
+  cx.strokeStyle = 'rgba(0, 229, 195, ' + (0.6 + 0.4 * pulse) + ')';
+  cx.lineWidth = 1.5;
+  cx.stroke();
+
+  cx.font = '700 9px Inter, sans-serif';
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.fillStyle = 'var(--teal)';
+  cx.fillText('🚨 ' + side + ' APPROACH: AMBULANCE LANE FREE — TRAFFIC YIELDING', CX, by + bannerH / 2);
+  cx.restore();
+}
+
+function updateAndDrawTraffic(dt, preemptionSide, isPreempting){
+  if(trafficDensity === 'off' || trafficCars.length === 0) return;
+  var h = RW / 2;
+  var laneIn = 21;
+  var stopMargin = 6;
+
+  var stopLines = {
+    'NORTH': CY - h - stopMargin,
+    'SOUTH': CY + h + stopMargin,
+    'EAST':  CX + h + stopMargin,
+    'WEST':  CX - h - stopMargin
+  };
+  var junctionExits = {
+    'NORTH': CY + h + stopMargin,
+    'SOUTH': CY - h - stopMargin,
+    'EAST':  CX - h - stopMargin,
+    'WEST':  CX + h + stopMargin
+  };
+
+  var bySide = {'NORTH':[], 'SOUTH':[], 'EAST':[], 'WEST':[]};
+  trafficCars.forEach(function(c){ bySide[c.side].push(c); });
+
+  // Update status badge in sidebar
+  var stPill = document.getElementById('traffic-status-banner');
+  var badge = document.getElementById('traffic-badge');
+  if(isPreempting && preemptionSide){
+    if(badge) badge.textContent = 'Yielding (Lane Free)';
+    if(stPill) {
+      stPill.innerHTML = '🚨 <b>' + preemptionSide + '</b> Lane Cleared · Traffic Yielding';
+      stPill.style.color = 'var(--amber)';
+    }
+  } else {
+    var curGreen = [];
+    ['NORTH','SOUTH','EAST','WEST'].forEach(function(s){ if(sig(s) === 'green') curGreen.push(s); });
+    if(badge) badge.textContent = 'Active (' + trafficCars.length + ')';
+    if(stPill) {
+      stPill.textContent = curGreen.length ? '🟢 Alternating: ' + curGreen.join('/') + ' Green' : '🟡 Clearance Interval';
+      stPill.style.color = 'var(--teal)';
+    }
+  }
+
+  // Draw emergency priority corridor if preemption is active
+  if(isPreempting && preemptionSide){
+    drawEmergencyCorridor(preemptionSide);
+  }
+
+  // Process cars per side
+  ['NORTH','SOUTH','EAST','WEST'].forEach(function(side){
+    var cars = bySide[side];
+    var isInc = (side === 'NORTH' || side === 'WEST');
+    var dirSign = isInc ? 1 : -1;
+    var stopPos = stopLines[side];
+    var exitPos = junctionExits[side];
+    var signalCol = sig(side);
+    var isEmergencyRoad = isPreempting && (preemptionSide === side);
+
+    cars.sort(function(a, b){
+      return isInc ? (b.pos - a.pos) : (a.pos - b.pos);
+    });
+
+    for(var i = 0; i < cars.length; i++){
+      var c = cars[i];
+      c.blinkTimer = (c.blinkTimer || 0) + dt;
+      if(c.blinkTimer >= 0.35){
+        c.blinkTimer = 0;
+        c.hazardBlink = !c.hazardBlink;
+      }
+
+      var targetSpeed = c.speed;
+      var isBeforeJunction = isInc ? (c.pos < stopPos) : (c.pos > stopPos);
+      var isInsideJunction = isInc ? (c.pos >= stopPos && c.pos <= exitPos) : (c.pos <= stopPos && c.pos >= exitPos);
+
+      // 1. Emergency Preemption: "Ambulance Lane Free"
+      if(isEmergencyRoad){
+        if(isBeforeJunction){
+          c.targetYieldOffset = 11; // Steer to shoulder
+          targetSpeed = 0; // Stop to open free corridor
+          c.isYielding = true;
+        } else if(isInsideJunction){
+          c.targetYieldOffset = 0;
+          targetSpeed = c.speed * 1.4; // Clear junction rapidly
+          c.isYielding = false;
+        } else {
+          c.targetYieldOffset = 0;
+          c.isYielding = false;
+        }
+      } else {
+        c.targetYieldOffset = 0;
+        c.isYielding = false;
+
+        // 2. Normal Alternating Signal Compliance
+        if(isBeforeJunction){
+          var distToStop = isInc ? (stopPos - c.pos) : (c.pos - stopPos);
+          if(distToStop <= 120){
+            if(signalCol === 'red' || signalCol === 'amber' || signalCol === 'yellow'){
+              if(distToStop <= 6) targetSpeed = 0;
+              else targetSpeed = Math.min(c.speed, (distToStop / 120) * c.speed);
+            } else if(signalCol === 'green'){
+              targetSpeed = c.speed;
+            }
+          }
+        }
+      }
+
+      // 3. Queueing behind car ahead
+      if(i > 0){
+        var ahead = cars[i - 1];
+        var gap = isInc ? (ahead.pos - c.pos) : (c.pos - ahead.pos);
+        var minGap = ahead.len / 2 + c.len / 2 + 10;
+        if(gap < minGap){
+          targetSpeed = 0;
+        } else if(gap < minGap + 40){
+          targetSpeed = Math.min(targetSpeed, ((gap - minGap) / 40) * c.speed);
+        }
+      }
+
+      // Smooth steering & acceleration transitions
+      c.yieldOffset += (c.targetYieldOffset - c.yieldOffset) * Math.min(1, dt * 6);
+      if(targetSpeed < c.currSpeed){
+        c.currSpeed = Math.max(targetSpeed, c.currSpeed - 140 * dt);
+        c.isBraking = true;
+      } else {
+        c.currSpeed = Math.min(targetSpeed, c.currSpeed + 70 * dt);
+        c.isBraking = false;
+      }
+
+      c.pos += dirSign * c.currSpeed * dt;
+
+      // Wrap around when leaving view
+      var isOffScreen = isInc ? (c.pos > SZ + 30) : (c.pos < -30);
+      if(isOffScreen){
+        var minPos = isInc ?
+          Math.min.apply(null, cars.map(function(k){return k.pos;})) :
+          Math.max.apply(null, cars.map(function(k){return k.pos;}));
+        c.pos = isInc ? Math.min(-30, minPos - 80) : Math.max(SZ + 30, minPos + 80);
+        c.color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+        c.currSpeed = c.speed;
+      }
+
+      drawCivilianCar(c, laneIn);
+    }
+  });
+}
+
 function drawFrame(){
   cx.clearRect(0,0,SZ,SZ);
   var h=RW/2;
@@ -1319,6 +1715,27 @@ function drawFrame(){
   jg.addColorStop(0,'rgba(0,229,195,.9)'); jg.addColorStop(1,'rgba(0,229,195,.1)');
   cx.fillStyle=jg; cx.fill();
 
+  // ── CIVILIAN TRAFFIC SIMULATION & AMBULANCE YIELDING ─────
+  var nowTime = performance.now();
+  var dt = Math.min(0.05, (nowTime - (lastTrafficTime || nowTime)) / 1000);
+  lastTrafficTime = nowTime;
+
+  var isPreempting = S && S.preemption_state && S.preemption_state !== 'NORMAL' && S.preemption_state !== 'FAIL_SAFE';
+  var preemptionSide = null;
+  if(S && S.target && S.target.approach){
+    preemptionSide = S.target.approach;
+  } else if(ambTrack.size > 0){
+    var minD = Infinity;
+    ambTrack.forEach(function(a){
+      if(a.dist_m < minD && a.dist_m > -30){
+        minD = a.dist_m;
+        preemptionSide = a.side;
+      }
+    });
+  }
+
+  updateAndDrawTraffic(dt, preemptionSide, isPreempting);
+
   // ── SIGNAL HEADS ─────────────────────────────────────────
   var so=h+22;
   drawSigHead(CX-so, CY-so, sig('NORTH'));
@@ -1358,6 +1775,7 @@ function drawFrame(){
 }
 
 // ── BOOT ───────────────────────────────────────────────────
+initTraffic(12);
 requestAnimationFrame(drawFrame);
 connect();
 </script>
