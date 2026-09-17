@@ -20,7 +20,9 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import android.util.Log
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.pow
@@ -33,6 +35,40 @@ class EmergencyLocationService : Service() {
     private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private var mqtt: MqttGateway? = null
     private val sequence = AtomicLong(100)
+    private val telemetryPacketsSent = AtomicInteger(0)
+
+    private fun initialBearing(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): Double {
+        val phi1 = Math.toRadians(fromLat)
+        val phi2 = Math.toRadians(toLat)
+        val dLambda = Math.toRadians(toLon - fromLon)
+        val y = Math.sin(dLambda) * Math.cos(phi2)
+        val x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda)
+        return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
+    }
+
+    private fun detectApproachSide(bearingFromJunctionToVehicle: Double): String {
+        val b = (bearingFromJunctionToVehicle % 360.0 + 360.0) % 360.0
+        return when {
+            b >= 315.0 || b < 45.0 -> "NORTH"
+            b < 135.0 -> "EAST"
+            b < 225.0 -> "SOUTH"
+            else -> "WEST"
+        }
+    }
+
+    private fun compassHeading(degrees: Double): String {
+        val deg = (degrees % 360.0 + 360.0) % 360.0
+        return when {
+            deg >= 337.5 || deg < 22.5 -> "N"
+            deg < 67.5 -> "NE"
+            deg < 112.5 -> "E"
+            deg < 157.5 -> "SE"
+            deg < 202.5 -> "S"
+            deg < 247.5 -> "SW"
+            deg < 292.5 -> "W"
+            else -> "NW"
+        }
+    }
     private lateinit var ambulanceId: String
     private lateinit var tripId: String
     private lateinit var requestId: String
@@ -97,7 +133,7 @@ class EmergencyLocationService : Service() {
     private fun startEmergency(intent: Intent) {
         if (::tripId.isInitialized && tripId == intent.getStringExtra(EXTRA_TRIP_ID) && mqtt != null) return
         lastAcceptedLocation=null; activeRoute=null; prioritySent=false
-        offRouteSamples=0; replanAfter=0
+        offRouteSamples=0; replanAfter=0; telemetryPacketsSent.set(0)
         clearedJunctions.clear(); activeJunctionIndex=0; tracker=null
         approachTracker.reset()
         ambulanceId = intent.getStringExtra(EXTRA_AMBULANCE_ID) ?: return stopSelf()
@@ -239,12 +275,20 @@ class EmergencyLocationService : Service() {
         }
         val fix = approachTracker.update(location, junctionLat, junctionLon)
         val position=route?.project(location.latitude,location.longitude)
-        val pathSide=fix.side ?: upcoming.firstOrNull { it.id==registeredJunctionId }?.approach
+        val relativeBearingFromJunction = initialBearing(junctionLat, junctionLon, location.latitude, location.longitude)
+        val quadrantApproach = detectApproachSide(relativeBearingFromJunction)
+        val inboundApproach = fix.side ?: quadrantApproach
+        val bearingToJunction = initialBearing(location.latitude, location.longitude, junctionLat, junctionLon)
+        val bearingCompass = compassHeading(bearingToJunction)
+        val travelCompass = compassHeading(fix.heading)
+        val travelHeadingStr = "${fix.heading.toInt()}° $travelCompass"
+
+        val pathSide=fix.side ?: upcoming.firstOrNull { it.id==registeredJunctionId }?.approach ?: inboundApproach
         val geometry=registry.getJSONObject("geometry")
-        val stopPoint=pathSide?.let { JunctionRegistry.pointAt(registry,it,geometry.getJSONObject("stop_progress").getDouble(it)) }
-        val exitPoint=pathSide?.let { JunctionRegistry.pointAt(registry,it,geometry.getJSONObject("exit_progress").getDouble(it)+registry.getJSONObject("detection").optDouble("exit_radius_metres",80.0)) }
-        val stop=stopPoint?.let { route?.project(it.latitude,it.longitude) }
-        val exit=exitPoint?.let { route?.project(it.latitude,it.longitude) }
+        val stopPoint=pathSide.let { JunctionRegistry.pointAt(registry,it,geometry.getJSONObject("stop_progress").getDouble(it)) }
+        val exitPoint=pathSide.let { JunctionRegistry.pointAt(registry,it,geometry.getJSONObject("exit_progress").getDouble(it)+registry.getJSONObject("detection").optDouble("exit_radius_metres",80.0)) }
+        val stop=stopPoint.let { route?.project(it.latitude,it.longitude) }
+        val exit=exitPoint.let { route?.project(it.latitude,it.longitude) }
         val routeSupported=registeredJunctionId !in clearedJunctions && position != null && stop != null && exit != null && position.lateral<=40 && stop.lateral<=15 &&
             exit.lateral<=15 && exit.progress>stop.progress && kotlin.math.abs((exit.heading-JunctionRegistry.exitHeading(registry,pathSide)+540)%360-180)<=60 &&
             kotlin.math.abs((stop.heading-fix.heading+540)%360-180)<=60
@@ -270,7 +314,8 @@ class EmergencyLocationService : Service() {
         val remaining=if(position != null && position.lateral<=40) (route!!.geometryLength-position.progress).coerceAtLeast(0.0) else null
         TripStatusRepository.update { it.copy(remainingRouteDistanceMetres=remaining,
             remainingRouteEtaSeconds=if(remaining!=null && route!=null && route.geometryLength>0) route.duration*remaining/route.geometryLength else null) }
-        val approach = fix.side ?: "Confirming ambulance approach"
+        val approach = fix.side ?: inboundApproach
+        val packetNumber = telemetryPacketsSent.incrementAndGet()
         val json = JSONObject().apply {
             put("schemaVersion", 1)
             put("sequenceNumber", sequence.incrementAndGet())
@@ -283,6 +328,14 @@ class EmergencyLocationService : Service() {
             put("speedMps", location.speed.coerceAtLeast(0f).toDouble())
             put("headingDegrees", fix.heading)
             put("travelHeading", fix.heading)
+            put("approachSide", inboundApproach)
+            put("direction", inboundApproach)
+            put("approach", inboundApproach)
+            put("inboundApproach", inboundApproach)
+            put("compassDirection", travelCompass)
+            put("bearingToJunction", bearingToJunction)
+            put("bearingCompass", bearingCompass)
+            put("distanceToStopLine", distance)
             put("sourceMode", "LIVE_PHONE")
             put("patientPriority", priority)
             put("patientCondition", condition)
@@ -297,7 +350,9 @@ class EmergencyLocationService : Service() {
             put("emergencyActive", true)
             put("timestamp", Instant.ofEpochMilli(location.time).toString())
         }
-        mqtt?.publish("lifelane/ambulance/$ambulanceId/telemetry", json.toString())
+        val rawJson = json.toString()
+        Log.d("LifeLaneTelemetry", "TX #$packetNumber: approach=$inboundApproach, heading=$travelHeadingStr, bearingToJunction=${bearingToJunction.toInt()}° $bearingCompass, payload=$rawJson")
+        mqtt?.publish("lifelane/ambulance/$ambulanceId/telemetry", rawJson)
         if (BuildConfig.DEVICE_SECRET.isNotBlank()) {
             mqtt?.publish("lifelane/ambulance/$ambulanceId/telemetry2", signed(json))
             if (replanAfter==0L && fix.confirmed && routeSupported && !prioritySent && distance > 0 && (distance <= 300 || distance/location.speed <= 45) &&
@@ -310,7 +365,11 @@ class EmergencyLocationService : Service() {
                     put("medicalPriority", when(priority) { "RED" -> "Critical"; "YELLOW" -> "Serious"; else -> "Stable" })
                     put("latitude", location.latitude); put("longitude", location.longitude)
                     put("gpsAccuracy", location.accuracy.toDouble()); put("speed", location.speed.toDouble())
-                    put("heading", fix.heading); put("approachSide", fix.side); put("approachConfidence", fix.confidence)
+                    put("heading", fix.heading)
+                    put("approachSide", inboundApproach)
+                    put("direction", inboundApproach)
+                    put("approach", inboundApproach)
+                    put("approachConfidence", fix.confidence)
                     put("travelHeading", fix.heading)
                     put("distanceToStopLine", distance); put("junctionEtaSeconds", distance/location.speed)
                     put("destinationHospitalId", destinationId); put("destinationHospitalName", destination)
@@ -324,6 +383,7 @@ class EmergencyLocationService : Service() {
                 if (route.remainingRouteDistanceMetres != null && route.remainingRouteEtaSeconds != null) {
                     request.put("routeDistanceMetres", route.remainingRouteDistanceMetres)
                     request.put("routeEtaSeconds", route.remainingRouteEtaSeconds)
+                    Log.d("LifeLanePriority", "Sending Priority Request for $registeredJunctionId from $inboundApproach: $request")
                     mqtt?.publish("lifelane/junction/$registeredJunctionId/priority", signed(request))
                     prioritySent = true
                 }
@@ -333,15 +393,20 @@ class EmergencyLocationService : Service() {
             it.copy(
                 latitude = location.latitude, longitude = location.longitude,
                 accuracyMetres = location.accuracy, speedMps = location.speed.coerceAtLeast(0f),
-                headingDegrees = if (location.hasBearing()) location.bearing else 0f,
+                headingDegrees = if (location.hasBearing()) location.bearing else fix.heading.toFloat(),
                 gpsStatus = if (location.accuracy <= 30f) "Accurate" else "Low accuracy",
                 gpsState = if (location.accuracy <= 30f) GpsState.ACCURATE else GpsState.LOW_ACCURACY,
-                locationUpdatedAt = Instant.ofEpochMilli(location.time), distanceMetres = if(routeSupported) distance else null, detectedApproach = approach,
+                locationUpdatedAt = Instant.ofEpochMilli(location.time), distanceMetres = if(routeSupported) distance else null,
+                detectedApproach = inboundApproach,
+                approachDirection = inboundApproach,
+                travelHeadingDirection = travelHeadingStr,
+                packetsSentCount = packetNumber,
+                lastSentPayload = rawJson,
                 requestId = requestId,
                 nextJunction = if(prioritySent) registry.getJSONObject("junction").getString("name") else next?.config?.getJSONObject("junction")?.getString("name") ?: "No supported junction ahead",
                 clearedJunctionCount = clearedJunctions.size,
                 junctionState = if(replanAfter!=0L) JunctionState.CANCELLED else if(it.acknowledgement!=null) it.junctionState else if(prioritySent) JunctionState.PRIORITY_REQUESTED else if(!routeSupported) JunctionState.OUTSIDE_COVERAGE else if(fix.confirmed) JunctionState.APPROACH_CONFIRMED else JunctionState.APPROACH_CONFIRMING,
-                requestStatus = if(replanAfter!=0L) "Approach cancelled; recalculating route" else if (it.acknowledgement != null) it.requestStatus else if (prioritySent) "Request sent" else if (!fix.confirmed) "Confirming ambulance approach" else "Monitoring route",
+                requestStatus = if(replanAfter!=0L) "Approach cancelled; recalculating route" else if (it.acknowledgement != null) it.requestStatus else if (prioritySent) "Request sent" else if (!fix.confirmed) "Confirming approach ($inboundApproach)" else "Monitoring route",
                 junctionStage = if (it.acknowledgement != null) it.junctionStage else if (prioritySent) JunctionStage.REQUEST_SENT else JunctionStage.MONITORING_ROUTE,
             )
         }

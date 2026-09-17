@@ -79,34 +79,36 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         // Mirror live service state (GPS / MQTT / signal) into UI state during active trips.
         viewModelScope.launch {
             TripStatusRepository.serviceState.collectLatest { service ->
-                if (_state.value.emergencyActive) {
-                    val newSignalStatus = service.signalStatus
-                    _state.value = _state.value.copy(
-                        latitude         = service.latitude,
-                        longitude        = service.longitude,
-                        accuracyMetres   = service.accuracyMetres,
-                        speedMps         = service.speedMps,
-                        headingDegrees   = service.headingDegrees,
-                        gpsStatus        = service.gpsStatus,
-                        gpsState         = service.gpsState,
-                        locationUpdatedAt = service.locationUpdatedAt,
-                        mqttStatus       = service.mqttStatus,
-                        mqttState        = service.mqttState,
-                        distanceMetres   = service.distanceMetres,
-                        nextJunction     = service.nextJunction,
-                        clearedJunctionCount = service.clearedJunctionCount,
-                        detectedApproach = service.detectedApproach,
-                        requestStatus    = service.requestStatus,
-                        requestId        = service.requestId.ifBlank { _state.value.requestId },
-                        junctionState    = service.junctionState,
-                        junctionStage    = service.junctionStage,
-                        acknowledgement  = service.acknowledgement,
-                        acknowledgementError = service.acknowledgementError,
-                        queuePosition    = service.queuePosition,
-                        signalStatus     = newSignalStatus,
-                        signalArms       = SignalArms.fromString(newSignalStatus),
-                    )
-                }
+                val newSignalStatus = service.signalStatus
+                _state.value = _state.value.copy(
+                    approachDirection        = service.approachDirection,
+                    travelHeadingDirection   = service.travelHeadingDirection,
+                    packetsSentCount         = service.packetsSentCount,
+                    lastSentPayload          = service.lastSentPayload,
+                    latitude                 = if (_state.value.emergencyActive) service.latitude else _state.value.latitude,
+                    longitude                = if (_state.value.emergencyActive) service.longitude else _state.value.longitude,
+                    accuracyMetres           = if (_state.value.emergencyActive) service.accuracyMetres else _state.value.accuracyMetres,
+                    speedMps                 = if (_state.value.emergencyActive) service.speedMps else _state.value.speedMps,
+                    headingDegrees           = if (_state.value.emergencyActive) service.headingDegrees else _state.value.headingDegrees,
+                    gpsStatus                = if (_state.value.emergencyActive) service.gpsStatus else _state.value.gpsStatus,
+                    gpsState                 = if (_state.value.emergencyActive) service.gpsState else _state.value.gpsState,
+                    locationUpdatedAt        = if (_state.value.emergencyActive) service.locationUpdatedAt else _state.value.locationUpdatedAt,
+                    mqttStatus               = if (_state.value.emergencyActive) service.mqttStatus else _state.value.mqttStatus,
+                    mqttState                = if (_state.value.emergencyActive) service.mqttState else _state.value.mqttState,
+                    distanceMetres           = if (_state.value.emergencyActive) service.distanceMetres else _state.value.distanceMetres,
+                    nextJunction             = if (_state.value.emergencyActive) service.nextJunction else _state.value.nextJunction,
+                    clearedJunctionCount     = service.clearedJunctionCount,
+                    detectedApproach         = service.detectedApproach,
+                    requestStatus            = if (_state.value.emergencyActive) service.requestStatus else _state.value.requestStatus,
+                    requestId                = service.requestId.ifBlank { _state.value.requestId },
+                    junctionState            = if (_state.value.emergencyActive) service.junctionState else _state.value.junctionState,
+                    junctionStage            = if (_state.value.emergencyActive) service.junctionStage else _state.value.junctionStage,
+                    acknowledgement          = service.acknowledgement,
+                    acknowledgementError     = service.acknowledgementError,
+                    queuePosition            = service.queuePosition,
+                    signalStatus             = if (_state.value.emergencyActive) newSignalStatus else _state.value.signalStatus,
+                    signalArms               = SignalArms.fromString(newSignalStatus),
+                )
             }
         }
     }

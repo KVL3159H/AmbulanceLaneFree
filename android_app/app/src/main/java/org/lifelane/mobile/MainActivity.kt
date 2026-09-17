@@ -110,16 +110,7 @@ import com.google.android.gms.location.Priority
 import java.time.Duration
 import java.time.Instant
 import org.lifelane.mobile.ui.components.LiveRouteMapView
-import org.lifelane.mobile.ui.theme.LifeLaneTheme
-import org.lifelane.mobile.ui.theme.SwiggyBorder
-import org.lifelane.mobile.ui.theme.SwiggyGreen
-import org.lifelane.mobile.ui.theme.SwiggyGreenSoft
-import org.lifelane.mobile.ui.theme.SwiggyOrange
-import org.lifelane.mobile.ui.theme.SwiggyOrangeDark
-import org.lifelane.mobile.ui.theme.SwiggyOrangeSoft
-import org.lifelane.mobile.ui.theme.SwiggyShapes
-import org.lifelane.mobile.ui.theme.SwiggyTextBody
-import org.lifelane.mobile.ui.theme.SwiggyTextHeading
+import org.lifelane.mobile.ui.theme.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -673,6 +664,7 @@ private fun ReviewScreen(state: TripUiState, vm: TripViewModel, start: () -> Uni
 
 @Composable
 private fun ActiveTripScreen(state: TripUiState, vm: TripViewModel) {
+    var showDebugPayload by rememberSaveable { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val compactHeight = maxHeight < 650.dp
         val sheetMaxHeight = maxHeight * .58f
@@ -729,6 +721,54 @@ private fun ActiveTripScreen(state: TripUiState, vm: TripViewModel) {
                         StatusTag("GPS ${state.gpsState.label()}", state.gpsState.colour(), Icons.Outlined.LocationOn, Modifier.weight(1f))
                         StatusTag("Control ${state.mqttState.label()}", state.mqttState.colour(), Icons.Outlined.NearMe, Modifier.weight(1f))
                     }
+                    Surface(
+                        color = SwiggyOrangeSoft,
+                        shape = SwiggyShapes.card,
+                        border = BorderStroke(1.dp, SwiggyBorder),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(Icons.Outlined.NearMe, null, tint = SwiggyOrange, modifier = Modifier.size(16.dp))
+                                    Text("APPROACH DIRECTION", style = MaterialTheme.typography.labelSmall, color = SwiggyOrangeDark, fontWeight = FontWeight.Bold)
+                                }
+                                Box(
+                                    Modifier
+                                        .background(SwiggyOrange, RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = state.approachDirection.uppercase(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.ExtraBold,
+                                    )
+                                }
+                            }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column {
+                                    Text("HEADING", style = MaterialTheme.typography.labelSmall, color = SwiggyTextBody)
+                                    Text(state.travelHeadingDirection, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("SPEED", style = MaterialTheme.typography.labelSmall, color = SwiggyTextBody)
+                                    Text("${"%.1f".format(state.speedMps)} m/s", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = SwiggyTextHeading)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("TX PACKETS", style = MaterialTheme.typography.labelSmall, color = SwiggyTextBody)
+                                    Text("#${state.packetsSentCount}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = SwiggyGreenDark)
+                                }
+                            }
+                        }
+                    }
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -751,6 +791,52 @@ private fun ActiveTripScreen(state: TripUiState, vm: TripViewModel) {
                     Text("Queue: ${state.queuePosition?.toString() ?: "—"} · Cleared junctions: ${state.clearedJunctionCount}", style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
                     Text("Raspberry Pi: ${if (state.acknowledgement == null) "Awaiting authenticated acknowledgement" else state.requestStatus}", style = MaterialTheme.typography.bodySmall, color = SwiggyTextBody)
                     if (state.mqttState != ConnectionState.CONNECTED) InlineBanner("Control connection interrupted", "Last confirmed state retained. Signal priority is not confirmed.", vm::retryConnections)
+                    Surface(
+                        color = Color(0xFF1E1E2E),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("DEBUG: TELEMETRY TX", style = MaterialTheme.typography.labelSmall, color = Color(0xFF89DCEB), fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = if (showDebugPayload) "Hide Payload ▲" else "Show Payload ▼",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFAB387),
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickable { showDebugPayload = !showDebugPayload },
+                                )
+                            }
+                            Text(
+                                "Topic: lifelane/ambulance/${state.ambulanceId.ifBlank { "AMB-001" }}/telemetry",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFA6ADC8),
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 11.sp,
+                            )
+                            Text(
+                                "Direction: ${state.approachDirection} | Heading: ${state.travelHeadingDirection} | TX #${state.packetsSentCount}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFA6E3A1),
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 11.sp,
+                            )
+                            if (showDebugPayload && state.lastSentPayload != null) {
+                                HorizontalDivider(color = Color(0xFF313244))
+                                Text(
+                                    state.lastSentPayload ?: "No payload sent yet",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFCDD6F4),
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
                             onClick = vm::requestCancel,
@@ -841,9 +927,30 @@ private fun SettingsScreen(state: TripUiState, vm: TripViewModel) {
                 Switch(state.demoHospitalMode, vm::setDemoHospitalMode)
             }
             HorizontalDivider()
+            Text("Approach Direction: ${state.approachDirection}", fontWeight = FontWeight.Bold, color = SwiggyOrangeDark)
+            Text("Travel Heading: ${state.travelHeadingDirection}")
+            Text("Packets Transmitted: ${state.packetsSentCount}")
             Text("Map: ${state.mapError ?: "No reported error"}")
             Text("Acknowledgement: ${state.acknowledgement?.controllerState ?: "None received"}")
             Text("Connection: ${vm.brokerHost()}:${vm.brokerPort()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.lastSentPayload != null) {
+                HorizontalDivider()
+                Text("Last Telemetry Payload:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                Surface(
+                    color = Color(0xFF1E1E2E),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Text(
+                        state.lastSentPayload ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFCDD6F4),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+            }
         }
         state.message?.let { InlineError(it) }
     }

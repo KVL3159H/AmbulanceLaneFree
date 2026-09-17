@@ -152,8 +152,11 @@ data class TripUiState(
     val gpsInterruptions: Int = 0,
     val networkInterruptions: Int = 0,
     val cancellationReason: String = "",
+    val approachDirection: String = "Unknown",
+    val travelHeadingDirection: String = "N/A",
+    val packetsSentCount: Int = 0,
+    val lastSentPayload: String? = null,
 )
 
 // Keep a static DEFAULT_HOSPITALS for backward-compat with any references outside the ViewModel
 val DEFAULT_HOSPITALS get() = HospitalRepository.RAJAPALAYAM_FALLBACK
-
