@@ -60,8 +60,7 @@ from PySide6.QtWidgets import (
 
 )
 
-
-
+from ..communication.hardware_bridge import HardwareBridge
 from ..communication.mqtt_client import MQTTClient
 from ..communication.hardware_monitor import HardwareMonitor
 
@@ -135,6 +134,7 @@ class MQTTBridge(QObject):
     error = Signal(str)
 
     ambulance_status = Signal(str, bool)
+    hardware_status = Signal(bool, str)
 
 
 
@@ -229,6 +229,7 @@ class MainWindow(QMainWindow):
         self.bridge.error.connect(lambda message: self._on_event("MQTT_ERROR", message))
 
         self.bridge.ambulance_status.connect(self._on_ambulance_status)
+        self.bridge.hardware_status.connect(self._handle_hardware_status)
 
 
 
@@ -295,7 +296,8 @@ class MainWindow(QMainWindow):
         self._update_clock()
 
         self._on_event("SAFE_INITIALIZATION", "Application started with all four approaches red")
-
+        self.hardware_bridge = HardwareBridge(status_callback=self._on_hardware_status_callback)
+        self.hardware_bridge.start()
         self.enable_live_mode()
 
 
@@ -397,11 +399,9 @@ class MainWindow(QMainWindow):
         self.mqtt_badge = ConnectionIndicator("MQTT  Disconnected", "critical")
 
         self.gps_badge = ConnectionIndicator("GPS  No data", "warning")
-
+        self.hardware_badge = ConnectionIndicator("ESP32  Probing", "warning")
         self.system_badge = ConnectionIndicator("System  Healthy", "success")
-
-        for badge in (self.mqtt_badge, self.gps_badge, self.system_badge): layout.addWidget(badge)
-
+        for badge in (self.mqtt_badge, self.gps_badge, self.hardware_badge, self.system_badge): layout.addWidget(badge)
         fullscreen = QPushButton(); fullscreen.setIcon(icon("fullscreen")); fullscreen.setIconSize(QSize(20, 20)); fullscreen.setFixedSize(40, 40)
 
         fullscreen.setToolTip("Toggle full screen (F11)"); fullscreen.setAccessibleName("Toggle full screen"); fullscreen.clicked.connect(self.toggle_fullscreen); layout.addWidget(fullscreen)
@@ -1172,6 +1172,8 @@ class MainWindow(QMainWindow):
         ctrl = self.coordinator.controller
         self.scene.update_signals(ctrl.signals)
         self.scene.update_traffic(step, ctrl.signals, ctrl.state, ctrl.target_approach)
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge:
+            self.hardware_bridge.send_signals(ctrl.signals, ctrl.state)
         self._refresh_panels()
         if self.stop_at_all_red and self.coordinator.controller.state is PreemptionState.NORMAL and all(c is SignalColour.RED for c in self.coordinator.controller.signals.values()):
             self.stop_at_all_red = False
@@ -1287,6 +1289,22 @@ class MainWindow(QMainWindow):
         if self.last_packet_at and (datetime.now(timezone.utc) - self.last_packet_at).total_seconds() > float(self.config.detection["maximum_packet_age_seconds"]):
 
             self.gps_badge.set_connection("GPS", "Stale")
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge and hasattr(self, "hardware_badge"):
+            if self.hardware_bridge.is_connected and self.hardware_bridge.connected_port:
+                if "Offline" in self.hardware_badge.text() or "Probing" in self.hardware_badge.text():
+                    self.hardware_badge.set_connection("ESP32", f"Connected ({self.hardware_bridge.connected_port})")
+
+    def _on_hardware_status_callback(self, connected: bool, port_or_msg: str) -> None:
+        self.bridge.hardware_status.emit(connected, port_or_msg)
+
+    def _handle_hardware_status(self, connected: bool, port_or_msg: str) -> None:
+        if not hasattr(self, "hardware_badge"):
+            return
+        if connected:
+            self.hardware_badge.set_connection("ESP32", f"Connected ({port_or_msg})")
+            self._on_event("HARDWARE_CONNECTED", f"Physical traffic light connected on {port_or_msg}")
+        else:
+            self.hardware_badge.set_connection("ESP32", port_or_msg if "Offline" in port_or_msg else "Offline")
 
 
 
@@ -1368,6 +1386,7 @@ class MainWindow(QMainWindow):
         if self.hardware_monitor: self.hardware_monitor.stop()
 
         if self.mqtt: self.mqtt.stop()
-
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge:
+            self.hardware_bridge.stop()
         self.repository.connection.close(); super().closeEvent(event)
 

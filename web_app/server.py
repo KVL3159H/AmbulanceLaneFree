@@ -38,6 +38,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from raspberry_pi_app.communication.hardware_bridge import HardwareBridge
 from raspberry_pi_app.core.config import load_config
 from raspberry_pi_app.core.coordinator import LifeLaneCoordinator
 from raspberry_pi_app.core.models import (
@@ -67,6 +68,7 @@ _event_log: list[dict] = []
 _sse_clients: list[queue.SimpleQueue] = []
 _state_lock = threading.Lock()
 _TICK_RATE = 0.10  # 10 Hz
+_hardware_bridge: HardwareBridge | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +248,8 @@ def _simulation_loop() -> None:
                     _sim_elapsed.pop(sim.trip_id, None)
 
             _coordinator.tick(dt, now_utc)
+            if _hardware_bridge:
+                _hardware_bridge.send_signals(_coordinator.controller.signals, _coordinator.controller.state)
 
         _broadcast(_build_state())
         sleep_time = max(0.0, _TICK_RATE - (time.monotonic() - now_mono))
@@ -457,6 +461,10 @@ def main() -> None:
     _coordinator.controller.running = True
     _on_event("SAFE_INITIALIZATION", "Web server started - junction in all-red safe state")
 
+    global _hardware_bridge
+    _hardware_bridge = HardwareBridge()
+    _hardware_bridge.start()
+
     sim_thread = threading.Thread(target=_simulation_loop, daemon=True)
     sim_thread.start()
 
@@ -479,6 +487,8 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Shutting down LifeLane web server.")
     finally:
+        if _hardware_bridge:
+            _hardware_bridge.stop()
         server.shutdown()
 
 
