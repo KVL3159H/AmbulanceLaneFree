@@ -64,6 +64,7 @@ class MQTTBridge(QObject):
     state = Signal(str)
     error = Signal(str)
     ambulance_status = Signal(str, bool)
+    hardware_status = Signal(bool, str)
 
 
 class MainWindow(QMainWindow):
@@ -100,6 +101,7 @@ class MainWindow(QMainWindow):
         self.bridge.state.connect(self._mqtt_state)
         self.bridge.error.connect(lambda message: self._on_event("MQTT_ERROR", message))
         self.bridge.ambulance_status.connect(self._on_ambulance_status)
+        self.bridge.hardware_status.connect(self._handle_hardware_status)
 
         self.coordinator = LifeLaneCoordinator(config, repository, self._on_event)
         self.scene = JunctionScene(float(config.detection["activation_radius_metres"]), float(config.detection["exit_radius_metres"]))
@@ -128,7 +130,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("F11"), self, activated=self.toggle_fullscreen)
         self._update_clock()
         self._on_event("SAFE_INITIALIZATION", "Application started with all four approaches red")
-        self.hardware_bridge = HardwareBridge(status_callback=self._on_hardware_status)
+        self.hardware_bridge = HardwareBridge(status_callback=self._on_hardware_status_callback)
         self.hardware_bridge.start()
         self.enable_live_mode()
 
@@ -432,17 +434,22 @@ class MainWindow(QMainWindow):
         self.health_page.refresh(self.mqtt_state, device, self.last_packet_at, packet_hz, time.monotonic() - self.started_monotonic, self.coordinator.controller.state.value)
         if self.last_packet_at and (datetime.now(timezone.utc) - self.last_packet_at).total_seconds() > float(self.config.detection["maximum_packet_age_seconds"]):
             self.gps_badge.set_connection("GPS", "Stale")
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge and hasattr(self, "hardware_badge"):
+            if self.hardware_bridge.is_connected and self.hardware_bridge.connected_port:
+                if "Offline" in self.hardware_badge.text() or "Probing" in self.hardware_badge.text():
+                    self.hardware_badge.set_connection("ESP32", f"Connected ({self.hardware_bridge.connected_port})")
 
-    def _on_hardware_status(self, connected: bool, port_or_msg: str) -> None:
-        def update() -> None:
-            if not hasattr(self, "hardware_badge"):
-                return
-            if connected:
-                self.hardware_badge.set_connection("ESP32", port_or_msg)
-                self._on_event("HARDWARE_CONNECTED", f"Physical traffic light connected on {port_or_msg}")
-            else:
-                self.hardware_badge.set_connection("ESP32", "Offline")
-        QTimer.singleShot(0, update)
+    def _on_hardware_status_callback(self, connected: bool, port_or_msg: str) -> None:
+        self.bridge.hardware_status.emit(connected, port_or_msg)
+
+    def _handle_hardware_status(self, connected: bool, port_or_msg: str) -> None:
+        if not hasattr(self, "hardware_badge"):
+            return
+        if connected:
+            self.hardware_badge.set_connection("ESP32", f"Connected ({port_or_msg})")
+            self._on_event("HARDWARE_CONNECTED", f"Physical traffic light connected on {port_or_msg}")
+        else:
+            self.hardware_badge.set_connection("ESP32", port_or_msg if "Offline" in port_or_msg else "Offline")
 
     def _mqtt_state(self, state: str) -> None:
         self.mqtt_state = state; display = state.split(" ", 1)[0]; self.mqtt_badge.set_connection("MQTT", display); self._on_event("MQTT_STATE", state)

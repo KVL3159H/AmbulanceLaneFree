@@ -62,6 +62,7 @@ class ConnectionIndicator(StatusBadge):
         normalized = state.upper()
         if (
             normalized in {"CONNECTED", "LIVE", "ONLINE", "HEALTHY"}
+            or "CONNECTED" in normalized
             or normalized.startswith("COM")
             or normalized.startswith("/DEV")
             or "TTY" in normalized

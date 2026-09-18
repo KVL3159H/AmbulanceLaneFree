@@ -48,6 +48,12 @@ class HardwareBridge:
         self._last_sent_str = ""
         self._last_send_time = 0.0
 
+    @property
+    def is_connected(self) -> bool:
+        """Return True if serial connection is open."""
+        with self.lock:
+            return bool(self.serial_conn and self.serial_conn.is_open)
+
     @classmethod
     def list_available_ports(cls) -> list[str]:
         """Return list of candidate USB/UART serial ports."""
