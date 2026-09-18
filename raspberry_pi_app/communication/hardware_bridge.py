@@ -179,22 +179,16 @@ class HardwareBridge:
             preemption_state not in (PreemptionState.NORMAL, PreemptionState.FAIL_SAFE, "NORMAL", "FAIL_SAFE")
         )
 
-        packet = {
-            "type": "signals",
-            "NORTH": signals.get(Approach.NORTH, SignalColour.RED).value,
-            "SOUTH": signals.get(Approach.SOUTH, SignalColour.RED).value,
-            "EAST": signals.get(Approach.EAST, SignalColour.RED).value,
-            "WEST": signals.get(Approach.WEST, SignalColour.RED).value,
-            "ns": ns_color,
-            "ew": ew_color,
-            "preemption": preemption_state.value if hasattr(preemption_state, "value") else str(preemption_state),
-            "preempt": 1 if preempt_active else 0,
-        }
-        line = json.dumps(packet) + "\n"
+        n_col = signals.get(Approach.NORTH, SignalColour.RED).value
+        s_col = signals.get(Approach.SOUTH, SignalColour.RED).value
+        e_col = signals.get(Approach.EAST, SignalColour.RED).value
+        w_col = signals.get(Approach.WEST, SignalColour.RED).value
+
+        line = f"SIG:N={n_col},S={s_col},E={e_col},W={w_col},PRE={'1' if preempt_active else '0'}\n"
 
         now = time.time()
-        # Avoid redundant serial traffic unless state changed or 1.5s heartbeat elapsed
-        if not force and line == self._last_sent_str and (now - self._last_send_time) < 1.5:
+        # Avoid redundant serial traffic unless state changed or 0.8s heartbeat elapsed
+        if not force and line == self._last_sent_str and (now - self._last_send_time) < 0.8:
             return True
 
         with self.lock:

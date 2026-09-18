@@ -46,12 +46,4 @@ def test_hardware_bridge_send_signals_with_mock_serial():
     assert mock_serial.write.called
 
     written_data = mock_serial.write.call_args[0][0].decode("utf-8")
-    payload = json.loads(written_data)
-
-    assert payload["type"] == "signals"
-    assert payload["NORTH"] == "RED"
-    assert payload["EAST"] == "GREEN"
-    assert payload["ns"] == "RED"
-    assert payload["ew"] == "GREEN"
-    assert payload["preemption"] == "AMBULANCE_GREEN"
-    assert payload["preempt"] == 1
+    assert "SIG:N=RED,S=RED,E=GREEN,W=GREEN,PRE=1" in written_data
