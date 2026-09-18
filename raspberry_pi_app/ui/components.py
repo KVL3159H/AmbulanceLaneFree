@@ -60,15 +60,21 @@ class StatusBadge(QFrame):
 class ConnectionIndicator(StatusBadge):
     def set_connection(self, label: str, state: str) -> None:
         normalized = state.upper()
-        if normalized in {"CONNECTED", "LIVE", "ONLINE", "HEALTHY"}:
+        if (
+            normalized in {"CONNECTED", "LIVE", "ONLINE", "HEALTHY"}
+            or normalized.startswith("COM")
+            or normalized.startswith("/DEV")
+            or "TTY" in normalized
+        ):
             tone = "success"
-        elif normalized in {"CONNECTING", "RECONNECTING", "NO DATA", "WAITING"}:
+        elif normalized in {"CONNECTING", "RECONNECTING", "NO DATA", "WAITING", "PROBING"}:
             tone = "warning"
-        elif "ERROR" in normalized or "DISCONNECTED" in normalized or "LOST" in normalized:
+        elif "ERROR" in normalized or "DISCONNECTED" in normalized or "LOST" in normalized or "OFFLINE" in normalized:
             tone = "critical"
         else:
             tone = "neutral"
-        self.set_status(f"{label}  {state.title()}", tone, f"{label} status: {state}")
+        display_text = f"{label}  {state}"
+        self.set_status(display_text, tone, f"{label} status: {state}")
 
 
 class SectionCard(QFrame):

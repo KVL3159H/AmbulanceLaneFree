@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..communication.hardware_bridge import HardwareBridge
 from ..communication.mqtt_client import MQTTClient
 from ..core.config import JunctionConfig
 from ..core.coordinator import LifeLaneCoordinator
@@ -127,6 +128,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("F11"), self, activated=self.toggle_fullscreen)
         self._update_clock()
         self._on_event("SAFE_INITIALIZATION", "Application started with all four approaches red")
+        self.hardware_bridge = HardwareBridge(status_callback=self._on_hardware_status)
+        self.hardware_bridge.start()
         self.enable_live_mode()
 
     def _build_ui(self) -> None:
@@ -181,8 +184,9 @@ class MainWindow(QMainWindow):
         self.clock = QLabel(); self.clock.setObjectName("Clock"); self.clock.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter); layout.addWidget(self.clock)
         self.mqtt_badge = ConnectionIndicator("MQTT  Disconnected", "critical")
         self.gps_badge = ConnectionIndicator("GPS  No data", "warning")
+        self.hardware_badge = ConnectionIndicator("ESP32  Probing", "warning")
         self.system_badge = ConnectionIndicator("System  Healthy", "success")
-        for badge in (self.mqtt_badge, self.gps_badge, self.system_badge): layout.addWidget(badge)
+        for badge in (self.mqtt_badge, self.gps_badge, self.hardware_badge, self.system_badge): layout.addWidget(badge)
         fullscreen = QPushButton(); fullscreen.setIcon(icon("fullscreen")); fullscreen.setIconSize(QSize(20, 20)); fullscreen.setFixedSize(40, 40)
         fullscreen.setToolTip("Toggle full screen (F11)"); fullscreen.setAccessibleName("Toggle full screen"); fullscreen.clicked.connect(self.toggle_fullscreen); layout.addWidget(fullscreen)
         return bar
@@ -379,6 +383,8 @@ class MainWindow(QMainWindow):
         ctrl = self.coordinator.controller
         self.scene.update_signals(ctrl.signals)
         self.scene.update_traffic(step, ctrl.signals, ctrl.state, ctrl.target_approach)
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge:
+            self.hardware_bridge.send_signals(ctrl.signals, ctrl.state)
         self._refresh_panels()
         if self.health_elapsed >= 1.0:
             self.health_elapsed = 0.0
@@ -427,6 +433,17 @@ class MainWindow(QMainWindow):
         if self.last_packet_at and (datetime.now(timezone.utc) - self.last_packet_at).total_seconds() > float(self.config.detection["maximum_packet_age_seconds"]):
             self.gps_badge.set_connection("GPS", "Stale")
 
+    def _on_hardware_status(self, connected: bool, port_or_msg: str) -> None:
+        def update() -> None:
+            if not hasattr(self, "hardware_badge"):
+                return
+            if connected:
+                self.hardware_badge.set_connection("ESP32", port_or_msg)
+                self._on_event("HARDWARE_CONNECTED", f"Physical traffic light connected on {port_or_msg}")
+            else:
+                self.hardware_badge.set_connection("ESP32", "Offline")
+        QTimer.singleShot(0, update)
+
     def _mqtt_state(self, state: str) -> None:
         self.mqtt_state = state; display = state.split(" ", 1)[0]; self.mqtt_badge.set_connection("MQTT", display); self._on_event("MQTT_STATE", state)
 
@@ -456,4 +473,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         self.timer.stop(); self.clock_timer.stop()
         if self.mqtt: self.mqtt.stop()
+        if hasattr(self, "hardware_bridge") and self.hardware_bridge:
+            self.hardware_bridge.stop()
         self.repository.connection.close(); super().closeEvent(event)
