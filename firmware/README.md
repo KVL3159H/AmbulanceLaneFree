@@ -1,76 +1,78 @@
-# LifeLane ESP32 Hardware Traffic Signal Integration
+# LifeLane ESP32 Hardware Traffic Signal Integration (LoRa + USB Sync)
 
-This directory contains the firmware and wiring specifications to connect physical 3D-printed traffic light posts (such as your yellow junction prototype) to LifeLane via a standard USB data cable.
-
----
-
-## 1. Prototype Overview & Features
-
-- **Direct Plug-and-Play USB Integration**: LifeLane automatically probes and connects to your ESP32 on **`COM5`** (Windows) or **`/dev/ttyUSB0`** (Raspberry Pi / Linux) at **115200 baud**.
-- **Synchronized Signal Control**: Physical LEDs update in real-time with the software cycle:
-  - **Normal Cycle**: Alternate North/South and East/West phases with standard Green → Yellow → All-Red clearance.
-  - **Ambulance Preemption**: When an ambulance approaches, the corresponding approach immediately switches to physical GREEN, conflicting faces turn RED, and the optional siren sounds!
-- **Power-On Self-Test**: Cycles through RED → YELLOW → GREEN for 1.5s on boot so you can instantly verify all wiring.
-- **Fail-Safe Watchdog**: If the USB cable is unplugged or the software stops, the ESP32 safely switches to blinking amber after 8 seconds.
+This directory contains the firmware and pinout specification for your 3D-printed traffic light post prototype.
 
 ---
 
-## 2. Pin Mapping (ESP32 Dev Board)
+## 1. Pin Configuration (Configured to Your Hardware)
 
-The pins are configured at the top of [`esp32_traffic_light.ino`](esp32_traffic_light/esp32_traffic_light.ino) and can be adjusted if your prototype is wired differently:
+The firmware in [`esp32_traffic_light.ino`](esp32_traffic_light/esp32_traffic_light.ino) is configured with your exact hardware connections:
 
-| Signal Function | ESP32 GPIO Pin | Description |
+### 4-Way Traffic Signal LEDs:
+| Approach | Direction | Red LED Pin | Green LED Pin | Logic |
+| :--- | :--- | :---: | :---: | :--- |
+| **Approach 1** | **North** | **GPIO 2** | **GPIO 5** | Active HIGH (`RED=HIGH, GRN=LOW` = Stop; `RED=LOW, GRN=HIGH` = Go) |
+| **Approach 2** | **South** | **GPIO 12** | **GPIO 14** | Active HIGH |
+| **Approach 3** | **East** | **GPIO 15** | **GPIO 22** | Active HIGH |
+| **Approach 4** | **West** | **GPIO 32** | **GPIO 13** | Active HIGH |
+
+### LoRa Module (SX1278 - 433 MHz):
+| LoRa Pin | ESP32 Pin | Description |
 | :--- | :---: | :--- |
-| **Approach 1 - Red LED** (North/South) | **GPIO 23** | Top Red LED on front face |
-| **Approach 1 - Yellow LED** (North/South) | **GPIO 22** | Middle Yellow LED on front face |
-| **Approach 1 - Green LED** (North/South) | **GPIO 21** | Bottom Green LED on front face |
-| **Approach 2 - Red LED** (East/West) | **GPIO 19** | Top Red LED on side face |
-| **Approach 2 - Yellow LED** (East/West) | **GPIO 18** | Middle Yellow LED on side face |
-| **Approach 2 - Green LED** (East/West) | **GPIO 5** | Bottom Green LED on side face |
-| **Optional Siren / Buzzer** | **GPIO 4** | Active buzzer for ambulance preemption sound |
-| **Status / Heartbeat LED** | **GPIO 2** | Built-in blue LED on ESP32 DevKit |
-| **Ground (GND)** | **GND** | Connect to cathode (-) of all LEDs via 220Ω-330Ω resistors |
+| **SCK** | **GPIO 18** | SPI Clock |
+| **MISO** | **GPIO 19** | SPI Master In / Slave Out |
+| **MOSI** | **GPIO 23** | SPI Master Out / Slave In |
+| **NSS / CS** | **GPIO 27** | Chip Select |
+| **RST** | **GPIO 25** | Reset |
+| **DIO0** | **GPIO 26** | Interrupt Request |
 
-> [!TIP]
-> If your LEDs share a positive VCC line instead of GND (Common Anode), simply change `#define LED_ACTIVE_HIGH true` to `false` in line 28 of the sketch.
+---
+
+## 2. Integrated Workflow (LifeLane Application + LoRa)
+
+The ESP32 firmware dynamically handles three modes:
+
+1. **USB Application Mode (LifeLane Desktop / Raspberry Pi)**:
+   - When the USB cable is plugged in and LifeLane is running, the app automatically connects on **`COM5`** at **115200 baud**.
+   - LifeLane sends real-time signal states (North, South, East, West) and emergency preemption status.
+   - The physical LEDs on your prototype switch in lockstep with the software GUI.
+   - When an ambulance approaches an approach (e.g. North), LifeLane triggers preemption and the ESP32 locks that direction to **GREEN** while keeping all conflicting approaches at **RED**.
+
+2. **LoRa Wireless Priority Mode**:
+   - The SX1278 radio constantly listens at **433 MHz**.
+   - When a priority packet matching your unit ID (`N02-SIG:S1`, `N02-SIG:S2`, `N02-SIG:S3`, or `N02-SIG:S4`) is received, the ESP32 grants immediate physical Green priority to that direction for 5 seconds and notifies LifeLane over Serial (`LORA_TRIGGER:...`).
+
+3. **Autonomous Standalone Mode (Fail-Safe)**:
+   - If the USB data cable is disconnected and no wireless LoRa signal is active, the ESP32 autonomously operates a safe 4-way traffic rotation (6s Green, 1.5s All-Red clearance per approach).
 
 ---
 
 ## 3. How to Flash the ESP32
 
-1. Open **Arduino IDE** (or VS Code with PlatformIO).
-2. Install the ESP32 board definitions if you haven't already:
-   - In Arduino IDE: `Tools` → `Board` → `Boards Manager...` → Search for `esp32` by Espressif Systems and click **Install**.
+1. Open **Arduino IDE**.
+2. Make sure you have installed the required libraries:
+   - **LoRa** library by Sandeep Mistry (`Sketch` → `Include Library` → `Manage Libraries...` → search `LoRa`).
 3. Open [`firmware/esp32_traffic_light/esp32_traffic_light.ino`](esp32_traffic_light/esp32_traffic_light.ino).
 4. Connect your prototype via the USB data cable.
 5. In Arduino IDE:
    - Select Board: **ESP32 Dev Module** (or **DOIT ESP32 DEVKIT V1**).
-   - Select Port: **COM5** (or the port assigned to the Silicon Labs CP210x / CH340 chip).
+   - Select Port: **COM5** (or detected port).
    - Upload Speed: **115200** or **921600**.
-6. Click **Upload**.
-7. Once uploaded, the prototype will run its startup self-test (cycling Red → Yellow → Green).
+6. Click **Upload** (➡️).
+7. On boot, the post will run a quick self-test cycling each direction to Green.
 
 ---
 
-## 4. Running the Complete System
+## 4. Running the Full System
 
-Simply run LifeLane normally:
+Run the LifeLane desktop application:
 
-### On Windows:
 ```powershell
 .venv\Scripts\python.exe -m raspberry_pi_app.main
 ```
-or
+or via the batch file:
 ```cmd
 run_windows.bat
 ```
 
-### On Raspberry Pi:
-```bash
-.venv/bin/python -m raspberry_pi_app.main
-```
-
-### What You Will See:
-1. LifeLane's top header bar will display the new badge: **`ESP32  COM5`** in **Green**.
-2. As the simulated junction cycles, the LEDs on your yellow 3D-printed post will physically change in exact real-time synchronization with the on-screen graphics.
-3. When you trigger an ambulance (or simulated emergency trip), the post will immediately grant physical green to that corridor!
+The top bar will show **`ESP32  COM5`** in **Green**, and all physical LEDs will actuate in real-time according to the application state!
