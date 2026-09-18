@@ -42,13 +42,15 @@ def test_gps_loss_during_ambulance_green_warns_and_times_out(config, packet_fact
     events = []
     coordinator = LifeLaneCoordinator(config, event_callback=lambda kind, msg: events.append((kind, msg)))
     start = datetime.now(timezone.utc)
-    coordinator.process_packet(packet_factory(distance=100, timestamp=start), start)
+    for i in range(4):
+        stamp = start - timedelta(seconds=3-i)
+        coordinator.process_packet(packet_factory(distance=130-10*i, sequence=i+1, timestamp=stamp), stamp)
     for second in range(1, 5):
         coordinator.tick(1, start + timedelta(seconds=second))
     assert coordinator.controller.state in {PreemptionState.AMBULANCE_GREEN, PreemptionState.PASSAGE_MONITORING}
     coordinator.tick(2, start + timedelta(seconds=7))
     assert any(kind == "GPS_CONNECTION_LOST" for kind, _ in events)
-    for second in range(8, 35):
+    for second in range(8, 85):
         coordinator.tick(1, start + timedelta(seconds=second))
     assert coordinator.controller.state is PreemptionState.NORMAL
     assert any("Maximum ambulance green" in message for _, message in events)
@@ -57,9 +59,10 @@ def test_gps_loss_during_ambulance_green_warns_and_times_out(config, packet_fact
 def test_two_conflicting_ambulances_served_without_reversal(config, packet_factory):
     coordinator = LifeLaneCoordinator(config)
     now = datetime.now(timezone.utc)
-    north = packet_factory(Approach.NORTH, distance=100, ambulance_id="AMB-001", trip_id="N", priority=PatientPriority.YELLOW, timestamp=now)
-    east = packet_factory(Approach.EAST, distance=100, ambulance_id="AMB-002", trip_id="E", priority=PatientPriority.RED, timestamp=now)
-    coordinator.process_packet(north, now)
-    coordinator.process_packet(east, now)
+    for side, identity, trip, priority in [(Approach.NORTH,"AMB-001","N",PatientPriority.YELLOW), (Approach.EAST,"AMB-002","E",PatientPriority.RED)]:
+        for i in range(4):
+            stamp = now - timedelta(seconds=3-i)
+            packet = packet_factory(side, distance=130-10*i, sequence=i+1, ambulance_id=identity, trip_id=trip, priority=priority, timestamp=stamp)
+            coordinator.process_packet(packet, stamp)
     assert coordinator.controller.target_trip_id == "N"  # already-selected request cannot be reversed
     assert len(coordinator.priority) == 2

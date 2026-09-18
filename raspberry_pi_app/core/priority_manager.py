@@ -29,21 +29,23 @@ class PriorityManager:
                 priority=packet.patient_priority,
                 condition=packet.patient_condition,
                 destination=packet.destination_hospital,
-                distance_metres=assessment.distance_metres,
+                distance_metres=assessment.route_distance_metres if assessment.route_distance_metres is not None else assessment.distance_metres,
                 eta_seconds=assessment.eta_seconds,
                 first_requested_at=now,
                 last_updated_at=now,
+                metadata={"requestId": packet.request_id},
             )
             self._requests[packet.trip_id] = request
         else:
             if request.status is not RequestStatus.ACTIVE:
                 request.approach = assessment.approach
             request.priority = packet.patient_priority
-            request.distance_metres = assessment.distance_metres
+            request.distance_metres = assessment.route_distance_metres if assessment.route_distance_metres is not None else assessment.distance_metres
             request.eta_seconds = assessment.eta_seconds
             request.last_updated_at = now
             request.condition = packet.patient_condition
             request.destination = packet.destination_hospital
+            request.metadata["requestId"] = packet.request_id
         return request
 
     def remove(self, trip_id: str, status: RequestStatus = RequestStatus.CANCELLED) -> PriorityRequest | None:
@@ -84,11 +86,15 @@ class PriorityManager:
             aging_steps = int(wait // self.waiting_protection_seconds)
             effective_medical_rank = max(0, request.priority.rank - aging_steps)
             eta = request.eta_seconds if request.eta_seconds is not None else float("inf")
+            distance = request.distance_metres if request.distance_metres is not None else float("inf")
             return (
                 0 if request.inside_junction else 1,
                 effective_medical_rank,
+                -wait if aging_steps >= 3 else 0,
                 eta,
+                distance,
                 -wait,
+                request.first_requested_at.timestamp(),
                 request.ambulance_id,
             )
 

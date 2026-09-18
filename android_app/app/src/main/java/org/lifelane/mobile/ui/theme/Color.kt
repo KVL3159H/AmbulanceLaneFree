@@ -2,62 +2,112 @@ package org.lifelane.mobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// =========================================================================
-// WhatsApp Brand Design Tokens
-// =========================================================================
+// ==============================================================================
+// Swiggy Signature Design Palette
+// ==============================================================================
+val SwiggyOrange = Color(0xFFFC8019)          // Primary brand & primary CTA
+val SwiggyOrangeDark = Color(0xFFE26A06)      // Hover / Pressed state
+val SwiggyOrangeSoft = Color(0xFFFFF2E7)      // Light pill & container background
+val SwiggyOrangeDeep = Color(0xFFD45800)      // Deep accent
+val SwiggyOrangeGlow = Color(0xFFFD5B1D)      // Vibrant gradient accent
 
-// WhatsApp Light Palette
-val WhatsAppTealGreen = Color(0xFF008069)          // Modern WhatsApp AppBar & primary brand
-val WhatsAppDeepTeal = Color(0xFF075E54)           // Classic WhatsApp deep forest teal
-val WhatsAppVibrantGreen = Color(0xFF25D366)       // Action buttons, FAB, badges, online status
-val WhatsAppBackgroundLight = Color(0xFFEFEAE2)    // WhatsApp chat doodle soft warm background
-val WhatsAppSurfaceLight = Color(0xFFFFFFFF)       // WhatsApp incoming bubble / clean surface
-val WhatsAppElevatedLight = Color(0xFFF0F2F5)      // WhatsApp elevated surfaces & side panels
-val WhatsAppBorderLight = Color(0xFFE9EDEF)        // WhatsApp subtle borders & dividers
-val WhatsAppTextPrimaryLight = Color(0xFF111B21)   // WhatsApp high-contrast dark text
-val WhatsAppTextSecondaryLight = Color(0xFF667781) // WhatsApp timestamps & subtitle text
-val WhatsAppTextMutedLight = Color(0xFF8696A0)     // WhatsApp muted metadata
-val WhatsAppBubbleOutgoingLight = Color(0xFFD9FDD3)// WhatsApp signature outgoing bubble green
-val WhatsAppBubbleIncomingLight = Color(0xFFFFFFFF)// WhatsApp incoming bubble white
-val WhatsAppBlueTick = Color(0xFF53BDEB)           // WhatsApp double checkmark blue
-val WhatsAppSecurityGold = Color(0xFFFFF3C4)       // WhatsApp end-to-end encryption card
-val WhatsAppSecurityText = Color(0xFF5E4500)       // WhatsApp encryption message text
+val SwiggyGreen = Color(0xFF60B244)           // Success, verified & veg indicator
+val SwiggyGreenDark = Color(0xFF439028)       // Dark green text
+val SwiggyGreenSoft = Color(0xFFEBF7E7)       // Pill container for success
 
-// WhatsApp Dark Palette
-val WhatsAppBackgroundDark = Color(0xFF0B141A)     // WhatsApp dark mode AMOLED background
-val WhatsAppSurfaceDark = Color(0xFF1F2C34)        // WhatsApp dark incoming bubble / card
-val WhatsAppElevatedDark = Color(0xFF202C33)       // WhatsApp dark top bar & elevated card
-val WhatsAppBorderDark = Color(0xFF2A3942)         // WhatsApp dark divider & card border
-val WhatsAppTextPrimaryDark = Color(0xFFE9EDEF)    // WhatsApp dark high-contrast text
-val WhatsAppTextSecondaryDark = Color(0xFF8696A0)  // WhatsApp dark secondary text
-val WhatsAppTextMutedDark = Color(0xFF667781)      // WhatsApp dark muted text
-val WhatsAppBubbleOutgoingDark = Color(0xFF005C4B) // WhatsApp dark outgoing bubble green
-val WhatsAppBubbleIncomingDark = Color(0xFF1F2C34) // WhatsApp dark incoming bubble
-val WhatsAppAccentGreenDark = Color(0xFF00A884)    // WhatsApp dark mode teal accent
+val SwiggyTextHeading = Color(0xFF282C3F)     // High-contrast primary charcoal text
+val SwiggyTextBody = Color(0xFF686B78)        // Description / secondary text
+val SwiggyTextMuted = Color(0xFF93959F)       // Micro-labels / timestamps
+val SwiggyTextLight = Color(0xFFFFFFFF)       // On-primary text
 
-// Status & Severity Colors (WhatsApp style)
-val EmergencyRed = Color(0xFFEA0038)               // WhatsApp call-decline vibrant red
-val WarningAmber = Color(0xFFF5A623)               // WhatsApp warning amber
-val ActiveGreen = Color(0xFF25D366)                // WhatsApp verified / delivered green
-val InformationBlue = Color(0xFF34B7F1)            // WhatsApp link / info blue
-val DisabledGrey = Color(0xFF8696A0)
-val LampOff = Color(0xFF1E293B)
+val SwiggyCanvas = Color(0xFFF4F4F6)          // Clean background
+val SwiggySurface = Color(0xFFFFFFFF)         // Pure card surface
+val SwiggySurfaceElevated = Color(0xFFFFFFFF) // Floating cards
+val SwiggyBorder = Color(0xFFE8E8EE)          // Subtle card border
+val SwiggyBorderSoft = Color(0xFFF0F0F5)      // Light dividers
 
-// Aliases for compatibility
-val PrimaryTeal = WhatsAppTealGreen
-val PrimaryHover = Color(0xFF00A884)
-val BackgroundDark = WhatsAppBackgroundDark
-val NavigationDark = WhatsAppElevatedDark
-val SurfaceDark = WhatsAppSurfaceDark
-val ElevatedDark = WhatsAppElevatedDark
-val BorderDark = WhatsAppBorderDark
-val TextPrimaryDark = WhatsAppTextPrimaryDark
-val TextSecondaryDark = WhatsAppTextSecondaryDark
-val TextMutedDark = WhatsAppTextMutedDark
+val SwiggyDarkCanvas = Color(0xFF121417)      // Deep obsidian dark canvas
+val SwiggyDarkSurface = Color(0xFF1C1F26)     // Raised dark card surface
+val SwiggyDarkRaised = Color(0xFF252A34)      // Elevated modal surface
+val SwiggyDarkBorder = Color(0xFF2F3642)      // Dark border outline
+val SwiggyDarkTextHeading = Color(0xFFF8FAFC)
+val SwiggyDarkTextBody = Color(0xFFA0AEC0)
+val SwiggyDarkTextMuted = Color(0xFF718096)
 
-val BackgroundLight = WhatsAppBackgroundLight
-val SurfaceLight = WhatsAppSurfaceLight
-val ElevatedLight = WhatsAppElevatedLight
-val BorderLight = WhatsAppBorderLight
-val TextPrimaryLight = WhatsAppTextPrimaryLight
-val TextSecondaryLight = WhatsAppTextSecondaryLight
+// System & Operational Indicators
+val EmergencyRed = Color(0xFFE53935)
+val WarningAmber = Color(0xFFFB8C00)
+val ActiveGreen = SwiggyGreen
+val InformationBlue = Color(0xFF1E88E5)
+val DisabledGrey = Color(0xFFA0AEC0)
+val LampOff = Color(0xFF344054)
+
+// LifeLane Aliases mapped to Swiggy
+val Canvas = SwiggyCanvas
+val Surface = SwiggySurface
+val SurfaceSoft = SwiggyOrangeSoft
+val PrimaryBlue = SwiggyOrange
+val PrimaryBlueDeep = SwiggyOrangeDark
+val PrimaryBlueSoft = SwiggyOrangeSoft
+val MobilityTeal = SwiggyGreen
+val MobilityTealSoft = SwiggyGreenSoft
+val TextPrimary = SwiggyTextHeading
+val TextSecondary = SwiggyTextBody
+val TextMuted = SwiggyTextMuted
+val Border = SwiggyBorder
+val AccentColor = SwiggyOrange
+
+val PrimaryTeal = SwiggyOrange
+val PrimaryHover = SwiggyOrangeDark
+val BackgroundLight = SwiggyCanvas
+val SurfaceLight = SwiggySurface
+val ElevatedLight = SwiggySurfaceElevated
+val BorderLight = SwiggyBorder
+val TextPrimaryLight = SwiggyTextHeading
+val TextSecondaryLight = SwiggyTextBody
+
+val DarkCanvas = SwiggyDarkCanvas
+val DarkSurface = SwiggyDarkSurface
+val DarkRaised = SwiggyDarkRaised
+val DarkTextPrimary = SwiggyDarkTextHeading
+val DarkTextSecondary = SwiggyDarkTextBody
+val DarkBorder = SwiggyDarkBorder
+val DarkNavigationBlue = SwiggyOrange
+val DarkMedicalTeal = SwiggyGreen
+val DarkCriticalRed = EmergencyRed
+val DarkWarningAmber = WarningAmber
+
+// Backward compatibility tokens mapped cleanly to Swiggy
+val WhatsAppTealGreen = SwiggyOrange
+val WhatsAppDeepTeal = SwiggyOrangeDark
+val WhatsAppVibrantGreen = SwiggyOrange
+val WhatsAppBackgroundLight = SwiggyCanvas
+val WhatsAppSurfaceLight = SwiggySurface
+val WhatsAppElevatedLight = SwiggyOrangeSoft
+val WhatsAppBorderLight = SwiggyBorder
+val WhatsAppTextPrimaryLight = SwiggyTextHeading
+val WhatsAppTextSecondaryLight = SwiggyTextBody
+val WhatsAppTextMutedLight = SwiggyTextMuted
+val WhatsAppBubbleOutgoingLight = SwiggyOrangeSoft
+val WhatsAppBubbleIncomingLight = SwiggySurface
+val WhatsAppBlueTick = SwiggyGreen
+val WhatsAppSecurityGold = SwiggyOrangeSoft
+val WhatsAppSecurityText = SwiggyOrangeDark
+val WhatsAppBackgroundDark = SwiggyDarkCanvas
+val WhatsAppSurfaceDark = SwiggyDarkSurface
+val WhatsAppElevatedDark = SwiggyDarkRaised
+val WhatsAppBorderDark = SwiggyDarkBorder
+val WhatsAppTextPrimaryDark = SwiggyDarkTextHeading
+val WhatsAppTextSecondaryDark = SwiggyDarkTextBody
+val WhatsAppTextMutedDark = SwiggyDarkTextMuted
+val WhatsAppBubbleOutgoingDark = Color(0xFF332014)
+val WhatsAppBubbleIncomingDark = SwiggyDarkSurface
+val WhatsAppAccentGreenDark = SwiggyOrange
+val BackgroundDark = SwiggyDarkCanvas
+val NavigationDark = SwiggyDarkSurface
+val SurfaceDark = SwiggyDarkSurface
+val ElevatedDark = SwiggyDarkRaised
+val BorderDark = SwiggyDarkBorder
+val TextPrimaryDark = SwiggyDarkTextHeading
+val TextSecondaryDark = SwiggyDarkTextBody
+val TextMutedDark = SwiggyDarkTextMuted
