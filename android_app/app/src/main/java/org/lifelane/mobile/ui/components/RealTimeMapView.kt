@@ -34,6 +34,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import org.lifelane.mobile.TripStatusRepository
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,8 +51,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONObject
 import org.lifelane.mobile.ui.theme.ActiveGreen
 import org.lifelane.mobile.ui.theme.EmergencyRed
-import org.lifelane.mobile.ui.theme.WhatsAppShapes
-import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
+import org.lifelane.mobile.ui.theme.SwiggyOrange
+import org.lifelane.mobile.ui.theme.SwiggyShapes
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -71,6 +73,7 @@ fun RealTimeMapView(
     distanceMetres: Double?,
     isEmergencyActive: Boolean,
     darkTheme: Boolean,
+    priorityConfirmed: Boolean = false,
     modifier: Modifier = Modifier,
     isExpandedView: Boolean = false,
     onToggleExpand: (() -> Unit)? = null,
@@ -79,6 +82,16 @@ fun RealTimeMapView(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var isMapLoaded by remember { mutableStateOf(false) }
     var followVehicle by remember { mutableStateOf(true) }
+
+    val serviceState by TripStatusRepository.serviceState.collectAsState()
+    LaunchedEffect(serviceState.activeRoutePoints, isMapLoaded) {
+        if(isMapLoaded) {
+            val points=org.json.JSONArray().apply { serviceState.activeRoutePoints.forEach { point ->
+                put(org.json.JSONArray().put(point.latitude).put(point.longitude))
+            } }
+            webViewRef?.evaluateJavascript("if(window.setMeasuredRoute) window.setMeasuredRoute($points);",null)
+        }
+    }
 
     val effectiveLat = ambulanceLat ?: 9.451500
     val effectiveLon = ambulanceLon ?: 77.553500
@@ -128,8 +141,8 @@ fun RealTimeMapView(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier.height(340.dp)),
-        shape = WhatsAppShapes.card,
+            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier),
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = if (darkTheme) Color(0xFF101921) else Color(0xFFE8ECEF)),
         border = BorderStroke(1.dp, if (darkTheme) Color(0xFF233544) else Color(0xFFCBD5E1)),
     ) {
@@ -208,6 +221,7 @@ fun RealTimeMapView(
                 signalStatus = signalStatus,
                 detectedApproach = detectedApproach,
                 isEmergencyActive = isEmergencyActive,
+                priorityConfirmed = priorityConfirmed,
                 darkTheme = darkTheme,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -303,10 +317,10 @@ fun RealTimeMapView(
                             .background(if (isEmergencyActive) EmergencyRed else ActiveGreen),
                     )
                     Text(
-                        if (isEmergencyActive) "LIVE GPS · REAL MAP" else "GPS STANDBY · REAL MAP",
+                        if (serviceState.gpsState == org.lifelane.mobile.GpsState.ACCURATE) "LIVE GPS · REAL MAP" else "LOCATION UNAVAILABLE · REAL MAP",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isEmergencyActive) EmergencyRed else WhatsAppVibrantGreen,
+                        color = if (isEmergencyActive) EmergencyRed else SwiggyOrange,
                     )
                     Text(
                         "· %.1f km/h".format(speedMps * 3.6f),
@@ -330,7 +344,7 @@ fun RealTimeMapView(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         CircularProgressIndicator(
-                            color = WhatsAppVibrantGreen,
+                            color = SwiggyOrange,
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp,
                         )
@@ -540,8 +554,7 @@ private fun generateLeafletHtml(
                     junctionMarker.bindTooltip('Preemption Junction', { direction: 'bottom', offset: [0, 16] });
                 }
 
-                // Draw route line connecting points
-                updateRouteLine(ambLat, ambLon, jLat, jLon, destLat, destLon);
+                // A route is drawn only after the navigation provider returns geometry.
             }
 
             function createAmbulanceIcon(heading, emergency) {
@@ -572,14 +585,6 @@ private fun generateLeafletHtml(
                     accuracyCircle.setRadius(Math.max(8, accuracy));
                 }
 
-                if (routePolyline) {
-                    var latlngs = routePolyline.getLatLngs();
-                    if (latlngs.length > 0) {
-                        latlngs[0] = newPos;
-                        routePolyline.setLatLngs(latlngs);
-                    }
-                }
-
                 if (follow) {
                     map.panTo(newPos, { animate: true, duration: 0.8 });
                 }
@@ -603,31 +608,14 @@ private fun generateLeafletHtml(
                 }
                 var ambPos = ambulanceMarker ? ambulanceMarker.getLatLng() : null;
                 var jPos = junctionMarker ? junctionMarker.getLatLng() : null;
-                updateRouteLine(ambPos ? ambPos.lat : null, ambPos ? ambPos.lng : null, jPos ? jPos.lat : null, jPos ? jPos.lng : null, lat, lon);
+
             }
 
-            function updateRouteLine(ambLat, ambLon, jLat, jLon, destLat, destLon) {
+            window.setMeasuredRoute = function(points) {
                 if (!map) return;
-                var points = [];
-                if (ambLat && ambLon) points.push([ambLat, ambLon]);
-                if (jLat && jLon) points.push([jLat, jLon]);
-                if (destLat && destLon) points.push([destLat, destLon]);
-
-                if (points.length < 2) return;
-
-                if (routePolyline) {
-                    routePolyline.setLatLngs(points);
-                } else {
-                    routePolyline = L.polyline(points, {
-                        color: '#00A884',
-                        weight: 5,
-                        opacity: 0.85,
-                        lineCap: 'round',
-                        lineJoin: 'round',
-                        dashArray: '8, 8'
-                    }).addTo(map);
-                }
-            }
+                if (routePolyline) map.removeLayer(routePolyline);
+                routePolyline = points.length >= 2 ? L.polyline(points, {color:'#2563EB',weight:5}).addTo(map) : null;
+            };
 
             function recenterAmbulance() {
                 if (map && ambulanceMarker) {

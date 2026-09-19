@@ -1,0 +1,177 @@
+{
+  "junction": {
+    "id": "JN-001",
+    "controller_id": "PI-JN-001",
+    "name": "LifeLane Demo Junction",
+    "latitude": 9.4515,
+    "longitude": 77.5535
+  },
+  "detection": {
+    "activation_radius_metres": 300,
+    "immediate_activation_radius_metres": 120,
+    "exit_radius_metres": 80,
+    "maximum_accuracy_metres": 30,
+    "maximum_packet_age_seconds": 5,
+    "heading_tolerance_degrees": 60,
+    "minimum_assumed_speed_mps": 2.0,
+    "waiting_time_protection_seconds": 30,
+    "consecutive_approach_samples": 3,
+    "minimum_heading_speed_mps": 2,
+    "maximum_speed_mps": 70,
+    "route_corridor_metres": 150,
+    "monitoring_distance_metres": 1000,
+    "request_eta_seconds": 45
+  },
+  "timing": {
+    "normal_cycle_mode": "SINGLE",
+    "paired_movements": false,
+    "normal_green_seconds": 10,
+    "minimum_green_seconds": 4,
+    "yellow_seconds": 3,
+    "all_red_seconds": 2,
+    "maximum_ambulance_green_seconds": 60
+  },
+  "mqtt": {
+    "broker": "localhost",
+    "port": 1883,
+    "topic_prefix": "lifelane",
+    "keepalive_seconds": 30
+  },
+  "simulation": {
+    "speed_multiplier": 1.0,
+    "ambulance_speed_mps": 12.0,
+    "gps_accuracy_metres": 6.0,
+    "packet_delay_seconds": 1.0
+  },
+  "geometry": {
+    "route_extent_metres": 1200,
+    "junction_half_width_metres": 20,
+    "polygon": [
+      [
+        -20,
+        -20
+      ],
+      [
+        20,
+        -20
+      ],
+      [
+        20,
+        20
+      ],
+      [
+        -20,
+        20
+      ]
+    ],
+    "paths": {
+      "NORTH": [
+        [
+          -4,
+          1200
+        ],
+        [
+          -4,
+          -1200
+        ]
+      ],
+      "EAST": [
+        [
+          1200,
+          4
+        ],
+        [
+          -1200,
+          4
+        ]
+      ],
+      "SOUTH": [
+        [
+          4,
+          -1200
+        ],
+        [
+          4,
+          1200
+        ]
+      ],
+      "WEST": [
+        [
+          -1200,
+          -4
+        ],
+        [
+          1200,
+          -4
+        ]
+      ]
+    },
+    "stop_progress": {
+      "NORTH": 1180,
+      "EAST": 1180,
+      "SOUTH": 1180,
+      "WEST": 1180
+    },
+    "exit_progress": {
+      "NORTH": 1220,
+      "EAST": 1220,
+      "SOUTH": 1220,
+      "WEST": 1220
+    },
+    "inbound_bearings": {
+      "NORTH": 180,
+      "EAST": 270,
+      "SOUTH": 0,
+      "WEST": 90
+    },
+    "outbound_bearings": {
+      "NORTH": 0,
+      "EAST": 90,
+      "SOUTH": 180,
+      "WEST": 270
+    },
+    "supported_movements": [
+      "NORTH_SOUTH",
+      "EAST_WEST",
+      "SOUTH_NORTH",
+      "WEST_EAST"
+    ]
+  },
+  "gpio": {
+    "pins": {
+      "NORTH": {
+        "RED": 17,
+        "YELLOW": 27,
+        "GREEN": 22
+      },
+      "EAST": {
+        "RED": 5,
+        "YELLOW": 6,
+        "GREEN": 13
+      },
+      "SOUTH": {
+        "RED": 19,
+        "YELLOW": 26,
+        "GREEN": 21
+      },
+      "WEST": {
+        "RED": 16,
+        "YELLOW": 20,
+        "GREEN": 12
+      }
+    }
+  },
+  "security": {
+    "authorized_ambulance_ids": [
+      "AMB-001",
+      "AMB-002",
+      "AMB-003",
+      "AMB-004",
+      "SIM-NORTH",
+      "SIM-SOUTH",
+      "SIM-EAST",
+      "SIM-WEST",
+      "SIM-SECOND"
+    ]
+  }
+}

@@ -52,6 +52,7 @@ def parse_args(bundle_dir: Path, working_dir: Path) -> argparse.Namespace:
     parser.add_argument("--screenshot", type=Path, help="Save screenshot when smoke test completes")
     parser.add_argument("--window-size", choices=["1440x900", "1100x700"], default="1440x900", help="Smoke-test viewport")
     parser.add_argument("--fullscreen-smoke", action="store_true", help="Exercise full-screen mode during the smoke test")
+    parser.add_argument("--auto-simulate", action="store_true", default=False, help="Explicitly start simulated ambulance on launch (default: False, listens for real mobile GPS)")
     return parser.parse_args()
 
 
@@ -110,6 +111,23 @@ def main() -> int:
     connection = connect_database(args.database)
     repository = Repository(connection, str(config.junction["id"]))
 
+    local_broker = None
+    host = os.getenv("LIFELANE_MQTT_HOST", str(config.mqtt["broker"]))
+    if host in {"localhost", "127.0.0.1"} and not os.getenv("LIFELANE_MQTT_USERNAME") and os.getenv("LIFELANE_MQTT_TLS", "false").lower() not in {"1", "true", "yes"}:
+        try:
+            from raspberry_pi_app.communication.local_broker import LocalBroker
+            candidate = LocalBroker(int(os.getenv("LIFELANE_MQTT_PORT", str(config.mqtt["port"]))))
+            if candidate.start():
+                local_broker = candidate
+        except Exception:
+            logging.getLogger("lifelane.main").debug("Local broker could not start (might already be running)")
+
+    try:
+        from raspberry_pi_app.communication.discovery_beacon import start_discovery_beacon
+        start_discovery_beacon(mqtt_port=int(os.getenv("LIFELANE_MQTT_PORT", str(config.mqtt["port"]))))
+    except Exception as exc:
+        logging.getLogger("lifelane.main").debug("Discovery beacon could not start: %s", exc)
+
     app = QApplication(sys.argv[:1])
     app.setApplicationName("LifeLane")
     app.setOrganizationName("LifeLane")
@@ -143,6 +161,10 @@ def main() -> int:
 
     if not args.headless_smoke_test:
         window.showMaximized()
+        if args.auto_simulate:
+            from raspberry_pi_app.core.models import Approach
+            window.enable_simulation_mode()
+            window.start_simulation(Approach.NORTH)
     else:
         window.show()
 
@@ -166,7 +188,11 @@ def main() -> int:
 
         QTimer.singleShot(2400, finish_smoke_test)
 
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        if local_broker:
+            local_broker.stop()
 
 
 if __name__ == "__main__":

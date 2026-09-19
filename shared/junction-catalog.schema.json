@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Emergency Way registered junction catalog",
+  "type": "object",
+  "required": ["schemaVersion", "junctions"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "junctions": {"type": "array", "minItems": 1, "items": {"$ref": "junction.schema.json"}}
+  }
+}

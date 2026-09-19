@@ -81,8 +81,8 @@ import org.lifelane.mobile.ui.theme.ActiveGreen
 import org.lifelane.mobile.ui.theme.EmergencyRed
 import org.lifelane.mobile.ui.theme.InformationBlue
 import org.lifelane.mobile.ui.theme.WarningAmber
-import org.lifelane.mobile.ui.theme.WhatsAppShapes
-import org.lifelane.mobile.ui.theme.WhatsAppVibrantGreen
+import org.lifelane.mobile.ui.theme.SwiggyOrange
+import org.lifelane.mobile.ui.theme.SwiggyShapes
 
 private const val METRES_PER_LAT_DEGREE = 111_320.0
 private const val JUNCTION_LAT = 9.451500
@@ -103,25 +103,18 @@ fun LiveRouteMapView(
     distanceMetres: Double?,
     isEmergencyActive: Boolean,
     darkTheme: Boolean,
+    priorityConfirmed: Boolean = false,
     modifier: Modifier = Modifier,
     isExpandedView: Boolean = false,
     accuracyMetres: Float? = null,
     onToggleExpand: (() -> Unit)? = null,
+    onMapError: (String?) -> Unit = {},
 ) {
     // Toggle between real-world OpenStreetMap tile view and tactical radar HUD
     var showRealMap by remember { mutableStateOf(true) }
 
-    // Dynamic corridor junction estimation based on location
-    val dynamicJunctionLat = when {
-        ambulanceLat != null && destinationLat != null -> (ambulanceLat + destinationLat) / 2.0
-        ambulanceLat != null -> ambulanceLat - 0.003
-        else -> JUNCTION_LAT
-    }
-    val dynamicJunctionLon = when {
-        ambulanceLon != null && destinationLon != null -> (ambulanceLon + destinationLon) / 2.0
-        ambulanceLon != null -> ambulanceLon
-        else -> JUNCTION_LON
-    }
+    val dynamicJunctionLat = JUNCTION_LAT
+    val dynamicJunctionLon = JUNCTION_LON
 
     if (showRealMap) {
         RealTimeMapView(
@@ -140,6 +133,7 @@ fun LiveRouteMapView(
             detectedApproach = detectedApproach,
             distanceMetres = distanceMetres,
             isEmergencyActive = isEmergencyActive,
+            priorityConfirmed = priorityConfirmed,
             darkTheme = darkTheme,
             modifier = modifier,
             isExpandedView = isExpandedView,
@@ -207,8 +201,8 @@ fun LiveRouteMapView(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier.height(340.dp)),
-        shape = WhatsAppShapes.card,
+            .then(if (isExpandedView) Modifier.fillMaxSize() else Modifier),
+        shape = SwiggyShapes.card,
         colors = CardDefaults.cardColors(containerColor = mapBgColor),
         border = BorderStroke(1.dp, if (darkTheme) Color(0xFF233544) else Color(0xFFCBD5E1)),
     ) {
@@ -299,6 +293,7 @@ fun LiveRouteMapView(
                 signalStatus = signalStatus,
                 detectedApproach = detectedApproach,
                 isEmergencyActive = isEmergencyActive,
+                priorityConfirmed = priorityConfirmed,
                 darkTheme = darkTheme,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -387,7 +382,7 @@ fun LiveRouteMapView(
                         if (isEmergencyActive) "PREEMPTION LIVE" else "DISPATCH TRACKING",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (isEmergencyActive) EmergencyRed else WhatsAppVibrantGreen,
+                        color = if (isEmergencyActive) EmergencyRed else SwiggyOrange,
                     )
                     Text(
                         "· %.1f km/h".format(speedMps * 3.6f),
@@ -548,12 +543,12 @@ private fun DrawScope.drawPreemptionPerimeter(
 
     // 300m Activation Zone
     drawCircle(
-        color = WhatsAppVibrantGreen.copy(alpha = 0.05f),
+        color = SwiggyOrange.copy(alpha = 0.05f),
         radius = radius300m,
         center = junctionPos,
     )
     drawCircle(
-        color = WhatsAppVibrantGreen.copy(alpha = 0.45f),
+        color = SwiggyOrange.copy(alpha = 0.45f),
         radius = radius300m,
         center = junctionPos,
         style = Stroke(width = 1.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)),
@@ -580,7 +575,7 @@ private fun DrawScope.drawPreemptionPerimeter(
         )
         drawLine(
             brush = Brush.linearGradient(
-                colors = listOf(WhatsAppVibrantGreen.copy(alpha = 0.7f), WhatsAppVibrantGreen.copy(alpha = 0.0f)),
+                colors = listOf(SwiggyOrange.copy(alpha = 0.7f), SwiggyOrange.copy(alpha = 0.0f)),
                 start = junctionPos,
                 end = sweepEnd,
             ),
@@ -607,14 +602,14 @@ private fun DrawScope.drawRoutePolyline(
     // Outer Glow / Casing
     drawPath(
         path = routePath,
-        color = WhatsAppVibrantGreen.copy(alpha = 0.28f),
+        color = SwiggyOrange.copy(alpha = 0.28f),
         style = Stroke(width = 16f, cap = StrokeCap.Round, join = StrokeJoin.Round),
     )
 
     // Solid Route Body
     drawPath(
         path = routePath,
-        color = WhatsAppVibrantGreen,
+        color = SwiggyOrange,
         style = Stroke(width = 7f, cap = StrokeCap.Round, join = StrokeJoin.Round),
     )
 
@@ -644,7 +639,7 @@ private fun DrawScope.drawJunctionTrafficLights(
         style = Fill,
     )
     drawRoundRect(
-        color = WhatsAppVibrantGreen,
+        color = SwiggyOrange,
         topLeft = Offset(junctionPos.x - junctionBoxSize / 2, junctionPos.y - junctionBoxSize / 2),
         size = Size(junctionBoxSize, junctionBoxSize),
         cornerRadius = CornerRadius(6f, 6f),
@@ -833,7 +828,7 @@ private fun DrawScope.drawAmbulanceMarker(
         cornerRadius = CornerRadius(4f, 4f),
     )
     drawRoundRect(
-        color = WhatsAppVibrantGreen,
+        color = SwiggyOrange,
         topLeft = badgeTopLeft,
         size = Size(badgeW, badgeH),
         cornerRadius = CornerRadius(4f, 4f),
@@ -859,11 +854,12 @@ internal fun FloatingNavigationCard(
     signalStatus: String,
     detectedApproach: String,
     isEmergencyActive: Boolean,
+    priorityConfirmed: Boolean,
     darkTheme: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val cardBg = (if (darkTheme) Color(0xFF0F172A) else Color.White).copy(alpha = 0.94f)
-    val isGreenPreemption = signalStatus.contains("GREEN", true) && detectedApproach != "Not detected"
+    val isGreenPreemption = priorityConfirmed
 
     Surface(
         modifier = modifier.shadow(8.dp, RoundedCornerShape(14.dp)),
@@ -883,20 +879,20 @@ internal fun FloatingNavigationCard(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(if (isGreenPreemption) ActiveGreen.copy(alpha = 0.18f) else WhatsAppVibrantGreen.copy(alpha = 0.15f)),
+                    .background(if (isGreenPreemption) ActiveGreen.copy(alpha = 0.18f) else SwiggyOrange.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Navigation,
                     contentDescription = null,
-                    tint = if (isGreenPreemption) ActiveGreen else WhatsAppVibrantGreen,
+                    tint = if (isGreenPreemption) ActiveGreen else SwiggyOrange,
                     modifier = Modifier.size(24.dp),
                 )
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isGreenPreemption) "Green Wave Active · Cross Junction" else "En Route to ${destination.ifBlank { "Destination" }}",
+                    text = if (isGreenPreemption) "Priority confirmed · Proceed safely" else "En route to ${destination.ifBlank { "destination" }}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = if (darkTheme) Color.White else Color(0xFF0F172A),
@@ -921,7 +917,7 @@ internal fun FloatingNavigationCard(
                     text = if (etaSec > 0) "%d s".format(etaSec) else "—",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = WhatsAppVibrantGreen,
+                    color = SwiggyOrange,
                 )
                 Text(
                     text = "ETA",
@@ -948,13 +944,13 @@ internal fun MapControlButton(
             .clickable(onClick = onClick),
         shape = CircleShape,
         color = when {
-            highlight -> WhatsAppVibrantGreen
+            highlight -> SwiggyOrange
             darkTheme -> Color(0xFF1E293B)
             else -> Color.White
         },
         border = BorderStroke(
             1.dp,
-            if (highlight) WhatsAppVibrantGreen else (if (darkTheme) Color(0xFF334155) else Color(0xFFCBD5E1)),
+            if (highlight) SwiggyOrange else (if (darkTheme) Color(0xFF334155) else Color(0xFFCBD5E1)),
         ),
     ) {
         Box(contentAlignment = Alignment.Center) {
