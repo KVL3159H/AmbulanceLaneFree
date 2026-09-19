@@ -71,6 +71,13 @@ class TelemetryPacket:
     route_eta_seconds: float | None = None
     upcoming_junction_id: str = ""
     supported_junction_count: int = 0
+    approach_side: str = ""
+    direction: str = ""
+    travel_heading: float | None = None
+    compass_direction: str = ""
+    bearing_to_junction: float | None = None
+    bearing_compass: str = ""
+    source_mode: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TelemetryPacket":
@@ -97,6 +104,13 @@ class TelemetryPacket:
             route_eta_seconds=float(data["routeEtaSeconds"]) if data.get("routeEtaSeconds") is not None else None,
             upcoming_junction_id=str(data.get("upcomingJunctionId", "")).strip(),
             supported_junction_count=max(0, int(data.get("supportedJunctionCount", 0))),
+            approach_side=str(data.get("approachSide") or data.get("approach") or data.get("inboundApproach") or "").strip().upper(),
+            direction=str(data.get("direction") or "").strip().upper(),
+            travel_heading=float(data["travelHeading"]) if data.get("travelHeading") is not None else None,
+            compass_direction=str(data.get("compassDirection") or "").strip(),
+            bearing_to_junction=float(data["bearingToJunction"]) if data.get("bearingToJunction") is not None else None,
+            bearing_compass=str(data.get("bearingCompass") or "").strip(),
+            source_mode=str(data.get("sourceMode", "")).strip().upper(),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -110,7 +124,7 @@ class TelemetryPacket:
             "accuracyMetres": self.accuracy_metres,
             "speedMps": self.speed_mps,
             "headingDegrees": self.heading_degrees,
-            "travelHeading": self.heading_degrees,
+            "travelHeading": self.travel_heading if self.travel_heading is not None else self.heading_degrees,
             "patientPriority": self.patient_priority.value,
             "patientCondition": self.patient_condition,
             "destinationHospital": self.destination_hospital,
@@ -124,6 +138,12 @@ class TelemetryPacket:
             "routeEtaSeconds": self.route_eta_seconds,
             "upcomingJunctionId": self.upcoming_junction_id,
             "supportedJunctionCount": self.supported_junction_count,
+            "approachSide": self.approach_side,
+            "direction": self.direction,
+            "compassDirection": self.compass_direction,
+            "bearingToJunction": self.bearing_to_junction,
+            "bearingCompass": self.bearing_compass,
+            "sourceMode": self.source_mode,
         }
 
 

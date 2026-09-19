@@ -916,7 +916,18 @@ private fun SettingsScreen(state: TripUiState, vm: TripViewModel) {
         Text("Use the same Wi-Fi as the PC. Copy its address from the desktop Settings page, then start a trip with Live mobile GPS enabled on the desktop.")
         OutlinedTextField(brokerHost, { brokerHost = it }, Modifier.fillMaxWidth(), label = { Text("PC address") }, singleLine = true)
         OutlinedTextField(brokerPort, { brokerPort = it }, Modifier.fillMaxWidth(), label = { Text("Port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        OutlinedButton({ vm.saveBroker(brokerHost, brokerPort) }, Modifier.fillMaxWidth().height(52.dp)) { Text("Save connection") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({
+                vm.triggerAutoDiscovery()
+                brokerHost = vm.brokerHost()
+                brokerPort = vm.brokerPort()
+            }, Modifier.weight(1.2f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = SwiggyOrange)) {
+                Text("Auto-Detect PC", fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton({ vm.saveBroker(brokerHost, brokerPort) }, Modifier.weight(0.8f).height(52.dp)) {
+                Text("Save")
+            }
+        }
         Text("Developer settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         if (!state.developerUnlocked) {
             OutlinedTextField(pin, { pin = it }, Modifier.fillMaxWidth(), label = { Text("Developer PIN") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))

@@ -57,19 +57,27 @@ class ApproachTracker(private val config: org.json.JSONObject) {
         val path=paths.getValue(side)
         val projection=path.project(location.latitude,location.longitude)
         val distance=geometry.getJSONObject("stop_progress").getDouble(side)-projection.progress
-        if(projection.lateral>detection.optDouble("route_corridor_metres",40.0)) {
+        val junction=config.getJSONObject("junction")
+        val jLat=junction.getDouble("latitude"); val jLon=junction.getDouble("longitude")
+        val directDistance=hypot((location.latitude-jLat)*111320,(location.longitude-jLon)*111320*cos(Math.toRadians(jLat)))
+        val maxCorridor=detection.optDouble("route_corridor_metres",40.0)
+        val routeMatch = projection.lateral <= maxCorridor || directDistance <= detection.optDouble("monitoring_distance_metres", 1500.0)
+        if(!routeMatch) {
             consecutive=0
             return Fix(confirmedSide,heading,0,distance,false)
         }
         if(candidateSide!=side) consecutive=0
         candidateSide=side
         val last=samples.lastOrNull()
-        val decreasing=last!=null && projection.progress-path.project(last.latitude,last.longitude).progress>1
+        val lastDirectDist = if(last!=null) hypot((last.latitude-jLat)*111320,(last.longitude-jLon)*111320*cos(Math.toRadians(jLat))) else directDistance
+        val decreasing=last!=null && (projection.progress-path.project(last.latitude,last.longitude).progress>1 || (lastDirectDist - directDistance) > 1.0)
         samples.addLast(location); while(samples.size>8) samples.removeFirst()
-        val headingMatch=moving && headingError(side)<=detection.optDouble("heading_tolerance_degrees",60.0)
+        val bearingToJunc = (Math.toDegrees(atan2((jLon-location.longitude)*111320*cos(Math.toRadians(jLat)), (jLat-location.latitude)*111320))+360)%360
+        val bearingError = abs((heading - bearingToJunc + 540) % 360 - 180)
+        val headingMatch = moving && (headingError(side) <= detection.optDouble("heading_tolerance_degrees", 60.0) || bearingError <= detection.optDouble("heading_tolerance_degrees", 60.0))
         val confidence=25+(if(headingMatch)25 else 0)+(if(decreasing)20 else 0)+
             (if(location.accuracy<=15)15 else 0)+(if(samples.size>=3 && moving)15 else 0)
-        consecutive=if(headingMatch && decreasing && distance>0) consecutive+1 else 0
+        consecutive=if(headingMatch && decreasing && (distance>0 || directDistance>0)) consecutive+1 else 0
         val confirmed=consecutive>=detection.optInt("consecutive_approach_samples",3) && confidence>=80
         if(confirmed) confirmedSide=side
         return Fix(confirmedSide,heading,confidence,distance,confirmed)

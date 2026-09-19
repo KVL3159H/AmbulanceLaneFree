@@ -139,21 +139,56 @@ class GPSEngine:
         distances = [value[1] for value in history]
         trend = self._trend(distances)
         moving = packet.speed_mps >= float(detection.get("minimum_heading_speed_mps", 2))
-        route_match = projection.lateral <= float(detection.get("route_corridor_metres", 40))
+        is_phone = (
+            getattr(packet, "source_mode", "") == "LIVE_PHONE"
+            or not packet.ambulance_id.startswith("SIM-")
+        )
+        corridor = float(detection.get("route_corridor_metres", 150))
+        route_match = projection.lateral <= corridor
         if not route_match:
-            history.pop()
-            if previous is not None:
-                self._last_packets[key] = previous
+            if is_phone and distance <= float(detection.get("monitoring_distance_metres", 1500)):
+                route_match = True
+                half_width = float(self.config.raw.get("geometry", {}).get("junction_half_width_metres", 20))
+                signed_stop = max(0.0, distance - half_width)
             else:
-                self._last_packets.pop(key, None)
-            self._confirmations[key] = 0
-            return GPSAssessment(packet, False, False, "outside configured route corridor")
-        approaching = heading_toward and moving and trend == "toward" and signed_stop > 0
+                history.pop()
+                if previous is not None:
+                    self._last_packets[key] = previous
+                else:
+                    self._last_packets.pop(key, None)
+                self._confirmations[key] = 0
+                return GPSAssessment(
+                    packet,
+                    True,
+                    False,
+                    "outside configured route corridor",
+                    distance_metres=distance,
+                    bearing_to_junction=to_junction,
+                    relative_bearing=relative,
+                    approach=approach,
+                    approaching=False,
+                    eta_seconds=None,
+                    filtered_speed_mps=packet.speed_mps,
+                    approach_confidence=0.0,
+                    signed_stop_distance=signed_stop,
+                    after_exit_metres=after_exit,
+                    inside_polygon=inside,
+                    route_distance_metres=max(0, signed_stop),
+                )
+        if is_phone and not inside:
+            half_width = float(self.config.raw.get("geometry", {}).get("junction_half_width_metres", 20))
+            inside = distance <= (half_width * 1.5)
+        heading_toward = (
+            angular_difference(smoothed_heading, projection.heading) <= float(detection["heading_tolerance_degrees"])
+            or angular_difference(smoothed_heading, to_junction) <= float(detection["heading_tolerance_degrees"])
+        )
+        stationary_at_junction = (not moving) and (signed_stop <= activation) and (signed_stop > 0) and heading_toward
+        approaching = (heading_toward and moving and trend == "toward" and signed_stop > 0) or stationary_at_junction
         clearly_away = not heading_toward and moving
         self._confirmations[key] = self._confirmations[key] + 1 if approaching else 0
-        confidence = (25 * route_match + 25 * (heading_toward and moving) +
-                      20 * (trend == "toward") + 15 * (packet.accuracy_metres <= 15) +
-                      15 * (len(history) >= 3 and moving))
+        confidence = (25 * route_match + 25 * (heading_toward or stationary_at_junction) +
+                      20 * (trend == "toward" or stationary_at_junction) + 15 * (packet.accuracy_metres <= 15) +
+                      15 * (len(history) >= 3 or stationary_at_junction))
         confirmed = self._confirmations[key] >= int(detection.get("consecutive_approach_samples", 3)) and confidence >= 80
         if confirmed:
             self._confirmed_sides[key] = approach
@@ -213,8 +248,10 @@ class GPSEngine:
         ):
             return "GPS accuracy is too poor"
         age = (now - packet.timestamp).total_seconds()
-        max_age = float(detection.get("maximum_packet_age_seconds", 5.0))
-        if age > max_age or age < -10.0:
+        is_phone = getattr(packet, "source_mode", "") == "LIVE_PHONE"
+        max_age = max(60.0 if is_phone else 5.0, float(detection.get("maximum_packet_age_seconds", 5.0)))
+        future_drift = -15.0 if is_phone else -10.0
+        if age > max_age or age < future_drift:
             return "GPS packet is stale or has an invalid future timestamp"
         if not packet.emergency_active:
             return "emergency trip is inactive"
