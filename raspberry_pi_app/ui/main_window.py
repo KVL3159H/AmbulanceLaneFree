@@ -111,8 +111,8 @@ from .junction_scene import JunctionScene, ResponsiveGraphicsView
 from .pages import EmergencyQueuePage, SettingsPage, SystemHealthPage, TripHistoryPage
 
 from .priority_queue_panel import PriorityQueuePanel
-
 from .theme import Color, Space, application_font, icon, load_stylesheet
+from .voice_announcer import VoiceAnnouncer
 
 
 
@@ -171,6 +171,7 @@ class MainWindow(QMainWindow):
 
 
         self.structured_log = EventLogger()
+        self.voice_announcer = VoiceAnnouncer(enabled=True)
         self.mqtt: MQTTClient | None = None
 
         self.hardware_monitor = None
@@ -723,11 +724,17 @@ class MainWindow(QMainWindow):
         self.last_packet_at = datetime.now(timezone.utc); self.packet_times.append(self.last_packet_at); self.packet_times = self.packet_times[-20:]
 
         if result.valid:
-
             self.scene.update_ambulance(result); self.gps_badge.set_connection("GPS", "Live")
-
+            approach_side = result.approach.value if result.approach else (packet.approach_side or "")
+            if approach_side:
+                compass = packet.compass_direction
+                if not compass:
+                    h_val = packet.travel_heading if packet.travel_heading is not None else packet.heading_degrees
+                    compass_names = ["North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West"]
+                    compass = compass_names[int(((h_val + 22.5) % 360) // 45)]
+                self.voice_announcer.announce_approach(packet.trip_id, approach_side, compass)
+                self.statusBar().showMessage(f"Ambulance {packet.ambulance_id} arriving from {approach_side.title()} Approach (Heading {compass})")
         else:
-
             self.gps_badge.set_connection("GPS", "Inaccurate")
 
 

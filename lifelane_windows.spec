@@ -48,6 +48,10 @@ hiddenimports = [
     "raspberry_pi_app.ui.event_log_panel",
     "raspberry_pi_app.ui.information_panel",
     "raspberry_pi_app.ui.priority_queue_panel",
+    "raspberry_pi_app.ui.voice_announcer",
+    "win32com",
+    "win32com.client",
+    "pythoncom",
     "raspberry_pi_app.main",
     "windows_app",
 ]

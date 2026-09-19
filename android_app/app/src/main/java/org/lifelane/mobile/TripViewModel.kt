@@ -53,7 +53,14 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     )
     val state = _state.asStateFlow()
 
-    fun brokerHost(): String = preferences.getString("mqtt_host", BuildConfig.MQTT_HOST).orEmpty()
+    fun brokerHost(): String {
+        val saved = preferences.getString("mqtt_host", null)
+        if (saved.isNullOrBlank() || saved.startsWith("10.18.230.")) {
+            preferences.edit { putString("mqtt_host", BuildConfig.MQTT_HOST) }
+            return BuildConfig.MQTT_HOST
+        }
+        return saved
+    }
     fun brokerPort(): String = preferences.getInt("mqtt_port", BuildConfig.MQTT_PORT).toString()
 
     fun saveBroker(host: String, portText: String) {
@@ -68,6 +75,14 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value.emergencyActive) retryConnections()
     }
 
+    fun triggerAutoDiscovery() {
+        _state.value = _state.value.copy(message = "Searching local Wi-Fi for LifeLane PC...")
+        BrokerDiscovery.startAutoDiscovery(getApplication(), viewModelScope) { host, port ->
+            saveBroker(host, port.toString())
+            _state.value = _state.value.copy(message = "Auto-connected to LifeLane PC at $host:$port")
+        }
+    }
+
     /**
      * Tracks the last (lat, lon) pair for which a hospital fetch was kicked off.
      * Stored as a pair so we re-fetch if the device moves to a different city.
@@ -76,6 +91,14 @@ class TripViewModel(application: Application) : AndroidViewModel(application) {
     private var lastFetchedCoords: Pair<Double, Double>? = null
 
     init {
+        // Automatically discover LifeLane PC on any local Wi-Fi / hotspot
+        BrokerDiscovery.startAutoDiscovery(getApplication(), viewModelScope) { host, port ->
+            if (brokerHost() != host) {
+                saveBroker(host, port.toString())
+                _state.value = _state.value.copy(message = "Auto-discovered LifeLane PC: $host:$port")
+            }
+        }
+
         // Mirror live service state (GPS / MQTT / signal) into UI state during active trips.
         viewModelScope.launch {
             TripStatusRepository.serviceState.collectLatest { service ->

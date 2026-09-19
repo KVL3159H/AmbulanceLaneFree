@@ -181,7 +181,12 @@ class EmergencyLocationService : Service() {
             { acknowledgement -> serviceScope.launch { handleAcknowledgement(acknowledgement) } },
             endpoint = {
                 val prefs = getSharedPreferences("lifelane_driver", 0)
-                Pair(prefs.getString("mqtt_host", BuildConfig.MQTT_HOST).orEmpty(), prefs.getInt("mqtt_port", BuildConfig.MQTT_PORT))
+                var host = prefs.getString("mqtt_host", BuildConfig.MQTT_HOST).orEmpty()
+                if (host.isBlank() || host.startsWith("10.18.230.")) {
+                    host = BuildConfig.MQTT_HOST
+                    prefs.edit().putString("mqtt_host", host).apply()
+                }
+                Pair(host, prefs.getInt("mqtt_port", BuildConfig.MQTT_PORT))
             },
         ).also { it.connect() }
         mqtt?.publish(
@@ -289,31 +294,54 @@ class EmergencyLocationService : Service() {
         val exitPoint=pathSide.let { JunctionRegistry.pointAt(registry,it,geometry.getJSONObject("exit_progress").getDouble(it)+registry.getJSONObject("detection").optDouble("exit_radius_metres",80.0)) }
         val stop=stopPoint.let { route?.project(it.latitude,it.longitude) }
         val exit=exitPoint.let { route?.project(it.latitude,it.longitude) }
-        val routeSupported=registeredJunctionId !in clearedJunctions && position != null && stop != null && exit != null && position.lateral<=40 && stop.lateral<=15 &&
-            exit.lateral<=15 && exit.progress>stop.progress && kotlin.math.abs((exit.heading-JunctionRegistry.exitHeading(registry,pathSide)+540)%360-180)<=60 &&
-            kotlin.math.abs((stop.heading-fix.heading+540)%360-180)<=60
-        val distance=if(routeSupported) stop!!.progress-position!!.progress else fix.distanceToStop
-        val departedRoute = position != null && (position.lateral > registry.getJSONObject("detection").optDouble("route_corridor_metres",40.0) ||
-            (location.speed >= 2 && kotlin.math.abs((position.heading-fix.heading+540)%360-180) > 100))
-        offRouteSamples=if(departedRoute && fix.distanceToStop>0) offRouteSamples+1 else 0
-        if(offRouteSamples>=3 && replanAfter==0L) {
-            if(prioritySent && BuildConfig.DEVICE_SECRET.isNotBlank()) {
-                mqtt?.publish("lifelane/junction/$registeredJunctionId/control",signed(JSONObject().apply {
-                    put("requestId",requestId); put("tripId",tripId); put("ambulanceId",ambulanceId)
-                    put("messageType","PRIORITY_CANCEL"); put("timestamp",Instant.now().toString())
+        val corridor = registry.getJSONObject("detection").optDouble("route_corridor_metres", 150.0).coerceAtLeast(150.0)
+        val directDistance = kotlin.math.hypot(
+            (location.latitude - junctionLat) * 111320.0,
+            (location.longitude - junctionLon) * 111320.0 * kotlin.math.cos(Math.toRadians(junctionLat))
+        )
+        val routeSupported = registeredJunctionId !in clearedJunctions &&
+            ((position != null && stop != null && exit != null && position.lateral <= corridor && stop.lateral <= 35 &&
+              exit.lateral <= corridor && exit.progress > stop.progress &&
+              kotlin.math.abs((exit.heading - JunctionRegistry.exitHeading(registry, pathSide) + 540) % 360 - 180) <= 60 &&
+              kotlin.math.abs((stop.heading - fix.heading + 540) % 360 - 180) <= 60) || directDistance <= 1500.0)
+        val distance = when {
+            position != null && stop != null && stop.progress >= position.progress -> stop.progress - position.progress
+            fix.distanceToStop > 0 -> fix.distanceToStop
+            else -> (directDistance - registry.getJSONObject("geometry").optDouble("junction_half_width_metres", 20.0)).coerceAtLeast(0.0)
+        }
+        val departedRoute = if (directDistance <= 1500.0) {
+            fix.distanceToStop > 0 && kotlin.math.abs((bearingToJunction - fix.heading + 540) % 360 - 180) > 110.0
+        } else {
+            position != null && (position.lateral > corridor ||
+                (location.speed >= 2 && kotlin.math.abs((position.heading - fix.heading + 540) % 360 - 180) > 100))
+        }
+        offRouteSamples = if (departedRoute && fix.distanceToStop > 0) offRouteSamples + 1 else 0
+        if (offRouteSamples >= 3 && replanAfter == 0L) {
+            if (prioritySent && BuildConfig.DEVICE_SECRET.isNotBlank()) {
+                mqtt?.publish("lifelane/junction/$registeredJunctionId/control", signed(JSONObject().apply {
+                    put("requestId", requestId); put("tripId", tripId); put("ambulanceId", ambulanceId)
+                    put("messageType", "PRIORITY_CANCEL"); put("timestamp", Instant.now().toString())
                 }))
             }
             // Wait out the configured bounded recovery before issuing a fresh identity.
-            val timing=registry.getJSONObject("timing")
-            replanAfter=System.currentTimeMillis()+((timing.getDouble("maximum_ambulance_green_seconds")+
-                timing.getDouble("yellow_seconds")+timing.getDouble("all_red_seconds")+5)*1000).toLong()
-            activeRoute=null
-            TripStatusRepository.update { it.copy(junctionState=JunctionState.CANCELLED,
-                requestStatus="Approach cancelled; recalculating route",acknowledgement=null) }
+            val timing = registry.getJSONObject("timing")
+            replanAfter = System.currentTimeMillis() + ((timing.getDouble("maximum_ambulance_green_seconds") +
+                timing.getDouble("yellow_seconds") + timing.getDouble("all_red_seconds") + 5) * 1000).toLong()
+            activeRoute = null
+            TripStatusRepository.update { it.copy(junctionState = JunctionState.CANCELLED,
+                requestStatus = "Approach cancelled; recalculating route", acknowledgement = null) }
         }
-        val remaining=if(position != null && position.lateral<=40) (route!!.geometryLength-position.progress).coerceAtLeast(0.0) else null
-        TripStatusRepository.update { it.copy(remainingRouteDistanceMetres=remaining,
-            remainingRouteEtaSeconds=if(remaining!=null && route!=null && route.geometryLength>0) route.duration*remaining/route.geometryLength else null) }
+        val remaining = if (position != null && position.lateral <= corridor) {
+            (route.geometryLength - position.progress).coerceAtLeast(0.0)
+        } else if (directDistance <= 1500.0) {
+            distance
+        } else null
+        TripStatusRepository.update { it.copy(remainingRouteDistanceMetres = remaining,
+            remainingRouteEtaSeconds = if (remaining != null && route != null && route.geometryLength > 0) {
+                route.duration * remaining / route.geometryLength
+            } else if (remaining != null && location.speed >= 1.5f) {
+                (remaining / location.speed.toDouble())
+            } else null) }
         val approach = fix.side ?: inboundApproach
         val packetNumber = telemetryPacketsSent.incrementAndGet()
         val json = JSONObject().apply {
@@ -355,7 +383,7 @@ class EmergencyLocationService : Service() {
         mqtt?.publish("lifelane/ambulance/$ambulanceId/telemetry", rawJson)
         if (BuildConfig.DEVICE_SECRET.isNotBlank()) {
             mqtt?.publish("lifelane/ambulance/$ambulanceId/telemetry2", signed(json))
-            if (replanAfter==0L && fix.confirmed && routeSupported && !prioritySent && distance > 0 && (distance <= 300 || distance/location.speed <= 45) &&
+            if (replanAfter == 0L && fix.confirmed && routeSupported && !prioritySent && distance > 0 && (distance <= 300 || (location.speed > 0 && distance / location.speed <= 45)) &&
                 TripStatusRepository.serviceState.value.mqttState == ConnectionState.CONNECTED) {
                 val request = JSONObject().apply {
                     put("schemaVersion", 2); put("messageType", "PRIORITY_REQUEST")
@@ -371,22 +399,19 @@ class EmergencyLocationService : Service() {
                     put("approach", inboundApproach)
                     put("approachConfidence", fix.confidence)
                     put("travelHeading", fix.heading)
-                    put("distanceToStopLine", distance); put("junctionEtaSeconds", distance/location.speed)
+                    put("distanceToStopLine", distance); put("junctionEtaSeconds", if (location.speed > 0.5f) distance / location.speed else 45.0)
                     put("destinationHospitalId", destinationId); put("destinationHospitalName", destination)
                     put("destinationLatitude", destinationLat); put("destinationLongitude", destinationLon)
-                    // Route distance is unavailable until an active route provider supplies it.
-                    put("routeDistanceMetres", JSONObject.NULL); put("routeEtaSeconds", JSONObject.NULL)
+                    val routeState = TripStatusRepository.serviceState.value
+                    val routeDist = routeState.remainingRouteDistanceMetres ?: distance
+                    val routeEta = routeState.remainingRouteEtaSeconds ?: (if (location.speed > 0.5f) distance / location.speed else 45.0)
+                    put("routeDistanceMetres", routeDist)
+                    put("routeEtaSeconds", routeEta)
                     put("supportedJunctionCount", upcoming.size.coerceAtLeast(1))
                 }
-                // Do not request hardware priority without a measured active route.
-                val route = TripStatusRepository.serviceState.value
-                if (route.remainingRouteDistanceMetres != null && route.remainingRouteEtaSeconds != null) {
-                    request.put("routeDistanceMetres", route.remainingRouteDistanceMetres)
-                    request.put("routeEtaSeconds", route.remainingRouteEtaSeconds)
-                    Log.d("LifeLanePriority", "Sending Priority Request for $registeredJunctionId from $inboundApproach: $request")
-                    mqtt?.publish("lifelane/junction/$registeredJunctionId/priority", signed(request))
-                    prioritySent = true
-                }
+                Log.d("LifeLanePriority", "Sending Priority Request for $registeredJunctionId from $inboundApproach: $request")
+                mqtt?.publish("lifelane/junction/$registeredJunctionId/priority", signed(request))
+                prioritySent = true
             }
         }
         TripStatusRepository.update {
@@ -396,14 +421,17 @@ class EmergencyLocationService : Service() {
                 headingDegrees = if (location.hasBearing()) location.bearing else fix.heading.toFloat(),
                 gpsStatus = if (location.accuracy <= 30f) "Accurate" else "Low accuracy",
                 gpsState = if (location.accuracy <= 30f) GpsState.ACCURATE else GpsState.LOW_ACCURACY,
-                locationUpdatedAt = Instant.ofEpochMilli(location.time), distanceMetres = if(routeSupported) distance else null,
+                locationUpdatedAt = Instant.ofEpochMilli(location.time),
+                distanceMetres = if (routeSupported && distance <= 1500.0) distance else null,
                 detectedApproach = inboundApproach,
                 approachDirection = inboundApproach,
                 travelHeadingDirection = travelHeadingStr,
                 packetsSentCount = packetNumber,
                 lastSentPayload = rawJson,
                 requestId = requestId,
-                nextJunction = if(prioritySent) registry.getJSONObject("junction").getString("name") else next?.config?.getJSONObject("junction")?.getString("name") ?: "No supported junction ahead",
+                nextJunction = if (prioritySent) registry.getJSONObject("junction").getString("name")
+                    else next?.config?.getJSONObject("junction")?.getString("name")
+                    ?: (if (distance <= 1500.0) registry.getJSONObject("junction").getString("name") else "No supported junction ahead"),
                 clearedJunctionCount = clearedJunctions.size,
                 junctionState = if(replanAfter!=0L) JunctionState.CANCELLED else if(it.acknowledgement!=null) it.junctionState else if(prioritySent) JunctionState.PRIORITY_REQUESTED else if(!routeSupported) JunctionState.OUTSIDE_COVERAGE else if(fix.confirmed) JunctionState.APPROACH_CONFIRMED else JunctionState.APPROACH_CONFIRMING,
                 requestStatus = if(replanAfter!=0L) "Approach cancelled; recalculating route" else if (it.acknowledgement != null) it.requestStatus else if (prioritySent) "Request sent" else if (!fix.confirmed) "Confirming approach ($inboundApproach)" else "Monitoring route",

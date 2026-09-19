@@ -21,7 +21,7 @@
         "consecutive_approach_samples": 3,
         "minimum_heading_speed_mps": 2,
         "maximum_speed_mps": 70,
-        "route_corridor_metres": 40,
+        "route_corridor_metres": 150,
         "monitoring_distance_metres": 1000,
         "request_eta_seconds": 45
       },

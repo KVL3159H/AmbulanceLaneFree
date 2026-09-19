@@ -61,6 +61,7 @@ class CurrentSignalCard(QFrame):
         self.explanation.hide()
         root.addWidget(self.explanation)
 
+
     def update_controller(self, controller: SignalController, remaining: float | None, selected_request: PriorityRequest | None = None) -> None:
         state = controller.state
         labels = {
@@ -76,13 +77,18 @@ class CurrentSignalCard(QFrame):
             PreemptionState.RETURN_TO_NORMAL: ("Restoring normal", "info"),
             PreemptionState.FAIL_SAFE: ("Fail-safe active", "critical"),
         }
+
         badge, tone = labels[state]
         self.badge.set_status(badge, tone, f"Preemption state: {state.value}")
         self.phase.value.setText(controller.normal_phase.value.replace("_", " ").title() if state is PreemptionState.NORMAL else badge)
         self.machine.value.setText(state.value.replace("_", " ").title())
         self.remaining.value.setText(f"{remaining:.1f} s" if remaining is not None else "Monitoring")
         self.selected.value.setText(selected_request.ambulance_id if selected_request else "None")
-        self.direction.value.setText(controller.target_approach.value.title() if controller.target_approach else "None")
+        self.direction.value.setText(
+            controller.target_approach.value.title()
+            if controller.target_approach
+            else (selected_request.approach.value.title() if selected_request else "None")
+        )
         if state is PreemptionState.FAIL_SAFE:
             self.explanation.setText("Safety invariant triggered. Every approach is forced red and timing is paused until a controlled reset.")
             self.explanation.show()
@@ -93,7 +99,8 @@ class CurrentSignalCard(QFrame):
 class ActiveEmergencyCard(QFrame):
     FIELDS = [
         ("ambulance", "Ambulance"), ("trip", "Trip ID"), ("condition", "Condition"),
-        ("approach", "Approach"), ("distance", "Distance"), ("eta", "ETA"),
+        ("approach", "Approach / Side"), ("direction", "Travel Direction"),
+        ("distance", "Distance"), ("eta", "ETA"),
         ("speed", "Speed"), ("accuracy", "GPS accuracy"), ("destination", "Destination"),
         ("request", "Request status"),
     ]
@@ -131,19 +138,67 @@ class ActiveEmergencyCard(QFrame):
         self.priority.set_priority(packet.patient_priority.value)
         colour = {"RED": Color.RED, "YELLOW": Color.AMBER, "GREEN": Color.GREEN}[packet.patient_priority.value]
         self.setStyleSheet(f"QFrame#SectionCard {{ border-left: 4px solid {colour}; }}")
+
+        approach_name = ""
+        if result.approach:
+            approach_name = result.approach.value.title()
+        elif packet.approach_side:
+            approach_name = packet.approach_side.title()
+        elif packet.direction:
+            approach_name = packet.direction.title()
+
+        if approach_name:
+            if result.approach_confidence >= 80 or result.eligible or request is not None:
+                approach_text = f"{approach_name} (Coming from {approach_name})"
+            else:
+                approach_text = f"{approach_name} (Detecting — {result.approach_confidence:.0f}%)"
+        else:
+            approach_text = "Confirming ambulance approach"
+
+        heading_val = packet.travel_heading if packet.travel_heading is not None else packet.heading_degrees
+        compass_val = packet.compass_direction
+        if not compass_val:
+            compass_dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+            idx = int(((heading_val + 22.5) % 360) // 45)
+            compass_val = compass_dirs[idx]
+
+        direction_text = f"{compass_val} ({heading_val:.0f}°) toward Junction"
+        if packet.bearing_compass:
+            direction_text += f" [Bearing {packet.bearing_compass}]"
+
+        dist_m = result.route_distance_metres
+        if dist_m is None and result.distance_metres is not None:
+            dist_m = max(0.0, result.distance_metres - 20.0)
+
+        dist_str = f"{dist_m:.0f} m to stop line" if dist_m is not None else "Locating..."
+
+        eta_str = "Unavailable"
+        if result.eta_seconds is not None:
+            eta_str = f"{result.eta_seconds:.1f} s"
+        elif dist_m is not None:
+            if packet.speed_mps < 1.0 and dist_m <= 300:
+                eta_str = "Waiting at signal"
+            elif packet.speed_mps >= 1.0:
+                eta_str = f"{dist_m / packet.speed_mps:.1f} s"
+            else:
+                eta_str = f"{dist_m / 10.0:.0f} s (est)"
+
         values = {
             "ambulance": packet.ambulance_id,
             "trip": packet.trip_id,
             "condition": packet.patient_condition.replace("_", " ").title(),
-            "approach": result.approach.value.title() if result.approach and result.approach_confidence >= 80 and (result.eligible or request is not None) else "Confirming ambulance approach",
-            "distance": f"{result.route_distance_metres:.0f} m to stop line" if result.route_distance_metres is not None else "Unavailable",
-            "eta": f"{result.eta_seconds:.1f} s" if result.eta_seconds is not None else "Unavailable",
+            "approach": approach_text,
+            "direction": direction_text,
+            "distance": dist_str,
+            "eta": eta_str,
             "speed": f"{packet.speed_mps:.1f} m/s",
             "accuracy": f"{packet.accuracy_metres:.1f} m",
             "destination": packet.destination_hospital,
             "request": request.status.value.replace("_", " ").title() if request else result.reason,
         }
-        for key, value in values.items(): self.rows[key].value.setText(value)
+        for key, value in values.items():
+            if key in self.rows:
+                self.rows[key].value.setText(value)
 
     def show_gps_loss(self) -> None:
         if self.content.isVisible():

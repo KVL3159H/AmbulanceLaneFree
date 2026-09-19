@@ -22,6 +22,7 @@ class JunctionRegistry(val configurations: List<JSONObject>) {
             if(junction.getString("id") in cleared) emptyList() else {
                 val geometry=config.getJSONObject("geometry")
                 val paths=geometry.getJSONObject("paths")
+                val corridor = config.getJSONObject("detection").optDouble("route_corridor_metres", 150.0).coerceAtLeast(150.0)
                 paths.keys().asSequence().mapNotNull { side ->
                     val stopPoint=pointAt(config,side,geometry.getJSONObject("stop_progress").getDouble(side))
                     val exitPoint=pointAt(config,side,geometry.getJSONObject("exit_progress").getDouble(side)+
@@ -30,9 +31,8 @@ class JunctionRegistry(val configurations: List<JSONObject>) {
                     val exit=route.project(exitPoint.latitude,exitPoint.longitude)
                     val expected=geometry.getJSONObject("inbound_bearings").getDouble(side)
                     val tolerance=config.getJSONObject("detection").optDouble("heading_tolerance_degrees",60.0)
-                    if(stop.lateral<=15 && exit.lateral<=15 && exit.progress>stop.progress &&
-                        stop.progress>=position.progress && abs((stop.heading-expected+540)%360-180)<=tolerance &&
-                        abs((exit.heading-exitHeading(config,side)+540)%360-180)<=tolerance)
+                    if(stop.lateral<=35.0 && exit.lateral<=corridor && exit.progress>stop.progress &&
+                        stop.progress>=position.progress-20.0 && abs((stop.heading-expected+540)%360-180)<=tolerance+30.0)
                         SupportedJunction(config,side,stop,exit) else null
                 }.toList().sortedBy { it.stop.lateral }.take(1)
             }

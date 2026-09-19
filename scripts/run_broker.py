@@ -434,11 +434,23 @@ async def run_broker(host: str = "0.0.0.0", port: int = 1883):
 
     broker = PureMQTTBroker(host, port)
     try:
+        from raspberry_pi_app.communication.discovery_beacon import start_discovery_beacon, stop_discovery_beacon
+        start_discovery_beacon(mqtt_port=port)
+    except Exception as e:
+        logger.debug("Could not start discovery beacon: %s", e)
+
+    try:
         await broker.start()
         while True:
             await asyncio.sleep(3600)
     except (asyncio.CancelledError, KeyboardInterrupt):
         logger.info("Broker stopped by user.")
+    finally:
+        try:
+            from raspberry_pi_app.communication.discovery_beacon import stop_discovery_beacon
+            stop_discovery_beacon()
+        except Exception:
+            pass
 
 
 def main():
