@@ -61,4 +61,17 @@ def load_config(path: str | Path | None = None) -> JunctionConfig:
     missing = required.difference(data or {})
     if missing:
         raise ValueError(f"Configuration sections missing: {', '.join(sorted(missing))}")
+    import math
+    for field in ("normal_green_seconds", "minimum_green_seconds", "yellow_seconds",
+                  "all_red_seconds", "maximum_ambulance_green_seconds"):
+        value = data["timing"].get(field)
+        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"Invalid positive signal duration: {field}")
+    if data["timing"]["minimum_green_seconds"] > data["timing"]["normal_green_seconds"]:
+        raise ValueError("minimum green cannot exceed normal green")
+    mode = data["timing"].get("normal_cycle_mode", "SINGLE")
+    if mode not in {"SINGLE", "PAIRED"}:
+        raise ValueError("normal_cycle_mode must be SINGLE or PAIRED")
+    if mode == "PAIRED" and not data["timing"].get("paired_movements", False):
+        raise ValueError("paired movements require an explicitly compatible physical model")
     return JunctionConfig(data, source)

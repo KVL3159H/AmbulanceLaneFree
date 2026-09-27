@@ -14,32 +14,32 @@ def advance_to_ambulance_green(controller: SignalController, approach=Approach.E
 
 def test_normal_traffic_cycle(config):
     controller = SignalController(config)
-    controller.tick(1)
-    assert controller.normal_phase is NormalPhase.NS_GREEN
+    controller.tick(float(config.timing["all_red_seconds"]))
+    assert controller.normal_phase is NormalPhase.NORTH_GREEN
     assert controller.signals[Approach.NORTH] is SignalColour.GREEN
-    assert controller.signals[Approach.SOUTH] is SignalColour.GREEN
+    assert controller.signals[Approach.SOUTH] is SignalColour.RED
     controller.tick(10)
-    assert controller.normal_phase is NormalPhase.NS_YELLOW
-    controller.tick(2)
+    assert controller.normal_phase is NormalPhase.NORTH_YELLOW
+    controller.tick(float(config.timing["yellow_seconds"]))
     assert all(value is SignalColour.RED for value in controller.signals.values())
-    controller.tick(1)
-    assert controller.normal_phase is NormalPhase.EW_GREEN
+    controller.tick(float(config.timing["all_red_seconds"]))
+    assert controller.normal_phase is NormalPhase.EAST_GREEN
 
 
 def test_safe_transition_into_preemption_has_yellow_and_all_red(config):
     seen = []
     controller = SignalController(config, lambda event, message: seen.append((event, message)))
-    controller.tick(1)
+    controller.tick(float(config.timing["all_red_seconds"]))
     controller.tick(4)
     assert controller.request_preemption(Approach.EAST, "TRIP-1")
     controller.tick(0.1)
     controller.tick(0.1)
     assert controller.state is PreemptionState.CLEAR_CURRENT_GREEN
     assert controller.signals[Approach.NORTH] is SignalColour.YELLOW
-    controller.tick(2)
+    controller.tick(float(config.timing["yellow_seconds"]))
     assert controller.state is PreemptionState.ALL_RED_CLEARANCE
     assert all(value is SignalColour.RED for value in controller.signals.values())
-    controller.tick(1)
+    controller.tick(float(config.timing["all_red_seconds"]))
     assert controller.signals[Approach.EAST] is SignalColour.GREEN
     assert sum(value is SignalColour.GREEN for value in controller.signals.values()) == 1
 
@@ -53,9 +53,9 @@ def test_safe_transition_out_of_preemption(config):
     controller.tick(0.01)
     assert controller.state is PreemptionState.RECOVERY_YELLOW
     assert controller.signals[Approach.EAST] is SignalColour.YELLOW
-    controller.tick(2)
+    controller.tick(float(config.timing["yellow_seconds"]))
     assert controller.state is PreemptionState.RECOVERY_ALL_RED
-    controller.tick(1)
+    controller.tick(float(config.timing["all_red_seconds"]))
     assert controller.state is PreemptionState.RETURN_TO_NORMAL
     controller.tick(0.01)
     assert controller.state is PreemptionState.NORMAL
@@ -81,7 +81,7 @@ def test_maximum_green_timeout(config):
 
 def test_no_conflicting_green_signals_during_all_transitions(config):
     controller = SignalController(config)
-    controller.tick(1)
+    controller.tick(float(config.timing["all_red_seconds"]))
     controller.tick(4)
     controller.request_preemption(Approach.WEST, "TRIP-1")
     for index in range(80):
@@ -107,8 +107,8 @@ def test_unsafe_state_enters_fail_safe(config):
 
 def test_application_restart_safe_initialization(config):
     first = SignalController(config)
-    first.tick(1)
+    first.tick(float(config.timing["all_red_seconds"]))
     restarted = SignalController(config)
     assert restarted.state is PreemptionState.NORMAL
-    assert restarted.normal_phase is NormalPhase.ALL_RED_BEFORE_NS
+    assert restarted.normal_phase is NormalPhase.ALL_RED_BEFORE_NORTH
     assert all(value is SignalColour.RED for value in restarted.signals.values())

@@ -38,7 +38,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+import hashlib
+import hmac
+import paho.mqtt.client as mqtt
+
 from raspberry_pi_app.communication.hardware_bridge import HardwareBridge
+from raspberry_pi_app.communication.local_broker import LocalBroker
 from raspberry_pi_app.core.config import load_config
 from raspberry_pi_app.core.coordinator import LifeLaneCoordinator
 from raspberry_pi_app.core.models import (
@@ -69,6 +74,9 @@ _sse_clients: list[queue.SimpleQueue] = []
 _state_lock = threading.Lock()
 _TICK_RATE = 0.10  # 10 Hz
 _hardware_bridge: HardwareBridge | None = None
+_local_broker: LocalBroker | None = None
+_mqtt_client: mqtt.Client | None = None
+_mqtt_connected: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +141,7 @@ def _build_state() -> dict:
         })
 
     ambulances = []
+    seen_ids = set()
     for sim in list(_simulations):
         if sim.finished:
             continue
@@ -145,6 +154,27 @@ def _build_state() -> dict:
             "priority": sim.priority.value,
             "active": sim.active,
         })
+        seen_ids.add(sim.ambulance_id)
+
+    now_utc = datetime.now(timezone.utc)
+    for trip_id, assessment in list(_coordinator.latest.items()):
+        if assessment.packet.ambulance_id in seen_ids:
+            continue
+        age = (now_utc - assessment.packet.timestamp).total_seconds()
+        if age > 60:
+            continue
+        side_str = assessment.approach.value if assessment.approach else (assessment.packet.approach_side or "EAST").upper()
+        dist = assessment.distance_metres if assessment.distance_metres is not None else (assessment.route_distance_metres or 0.0)
+        ambulances.append({
+            "id": assessment.packet.ambulance_id,
+            "trip_id": trip_id,
+            "side": side_str,
+            "dist_m": round(dist, 1),
+            "speed_mps": assessment.filtered_speed_mps,
+            "priority": assessment.packet.patient_priority.value,
+            "active": not assessment.cleared,
+        })
+        seen_ids.add(assessment.packet.ambulance_id)
 
     target_trip = ctrl.target_trip_id
     target_info: dict[str, Any] = {}
@@ -173,21 +203,37 @@ def _build_state() -> dict:
         "ambulances": ambulances,
         "remaining_s": remaining,
         "events": list(_event_log[-20:]),
-        "connected_ambulance_ids": [sim.ambulance_id for sim in _simulations if not sim.finished],
+        "connected_ambulance_ids": [a["id"] for a in ambulances],
         "sse_clients": len(_sse_clients),
     }
 
 
 def _mqtt_status() -> dict:
     """Return a snapshot of MQTT broker connectivity and connected ambulance IDs."""
+    now_utc = datetime.now(timezone.utc)
     with _state_lock:
-        active_ambs = [
-            {"id": sim.ambulance_id, "trip_id": sim.trip_id,
-             "side": sim.starting_side.value, "priority": sim.priority.value}
-            for sim in _simulations if not sim.finished
-        ]
+        active_ambs = []
+        seen = set()
+        for trip_id, assessment in list(_coordinator.latest.items()):
+            if (now_utc - assessment.packet.timestamp).total_seconds() <= 60:
+                side_str = assessment.approach.value if assessment.approach else (assessment.packet.approach_side or "EAST").upper()
+                active_ambs.append({
+                    "id": assessment.packet.ambulance_id,
+                    "trip_id": trip_id,
+                    "side": side_str,
+                    "priority": assessment.packet.patient_priority.value,
+                })
+                seen.add(assessment.packet.ambulance_id)
+        for sim in _simulations:
+            if not sim.finished and sim.ambulance_id not in seen:
+                active_ambs.append({
+                    "id": sim.ambulance_id,
+                    "trip_id": sim.trip_id,
+                    "side": sim.starting_side.value,
+                    "priority": sim.priority.value,
+                })
     return {
-        "broker_connected": True,   # web server is always the broker-side here
+        "broker_connected": _mqtt_connected,
         "ambulance_count": len(active_ambs),
         "ambulances": active_ambs,
         "sse_clients": len(_sse_clients),
@@ -221,6 +267,224 @@ def _remaining_time() -> float | None:
     else:
         return None
     return round(max(0.0, float(duration) - ctrl.elapsed), 1)
+
+
+# ---------------------------------------------------------------------------
+# MQTT Integration (Listens to real mobile app telemetry & sends priority ACK)
+# ---------------------------------------------------------------------------
+
+def _parse_telemetry(raw: bytes | str) -> TelemetryPacket | None:
+    try:
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        data = json.loads(raw)
+        if "payload" in data and "signature" in data and isinstance(data["payload"], str):
+            data = json.loads(data["payload"])
+        return TelemetryPacket.from_dict(data)
+    except Exception as exc:
+        logger.debug("Failed to parse telemetry packet: %s", exc)
+        return None
+
+
+def _handle_mqtt_priority_request(client: mqtt.Client, topic: str, raw_payload: bytes) -> None:
+    try:
+        env = json.loads(raw_payload.decode("utf-8"))
+        if "payload" in env and "signature" in env and isinstance(env["payload"], str):
+            req_data = json.loads(env["payload"])
+        else:
+            req_data = env
+
+        amb_id = str(req_data.get("ambulanceId", ""))
+        trip_id = str(req_data.get("tripId", ""))
+        req_id = str(req_data.get("requestId", ""))
+        approach_str = str(req_data.get("approach", req_data.get("direction", "EAST"))).upper()
+        prio_str = str(req_data.get("medicalPriority", "RED")).upper()
+        if prio_str in {"CRITICAL", "RED"}:
+            prio = PatientPriority.RED
+        elif prio_str in {"SERIOUS", "YELLOW"}:
+            prio = PatientPriority.YELLOW
+        else:
+            prio = PatientPriority.GREEN
+
+        try:
+            appr = Approach(approach_str)
+        except ValueError:
+            appr = Approach.EAST
+
+        dist = float(req_data.get("distanceToStopLine", 200.0))
+        speed_val = max(float(req_data.get("speed", 10.0)), 1.0)
+        eta = float(req_data.get("junctionEtaSeconds", dist / speed_val))
+
+        with _state_lock:
+            result = _coordinator.priority.request(
+                trip_id=trip_id,
+                ambulance_id=amb_id,
+                approach=appr,
+                distance_metres=dist,
+                priority=prio,
+                eta_seconds=eta,
+                now_utc=datetime.now(timezone.utc),
+            )
+
+        _on_event("PRIORITY_REQUEST", f"{amb_id} requested priority on {appr.value} ({result.status.value})")
+        _broadcast(_build_state())
+
+        prefix = str(_config.mqtt.get("topic_prefix", "lifelane"))
+        junc_id = str(_config.junction.get("id", "junc-001"))
+        ack_topic = f"{prefix}/junction/{junc_id}/ack"
+        ack_payload = {
+            "schemaVersion": 2,
+            "messageType": "PRIORITY_ACK",
+            "requestId": req_id,
+            "tripId": trip_id,
+            "ambulanceId": amb_id,
+            "junctionId": junc_id,
+            "status": "GRANTED" if result.status.value in {"GRANTED", "ACTIVE", "WAITING", "EXTENDED"} else result.status.value,
+            "grantedApproach": appr.value,
+            "controllerState": _coordinator.controller.state.value,
+            "acknowledgementTimestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        raw_ack = json.dumps(ack_payload)
+        secrets = getattr(_config, "secrets", {})
+        secret = secrets.get(amb_id, os.getenv("DEVICE_SECRET", "dev-device-secret-key-32chars-min!!"))
+        sig = hmac.new(secret.encode("utf-8"), raw_ack.encode("utf-8"), hashlib.sha256).hexdigest()
+        envelope = {"payload": raw_ack, "signature": sig}
+        client.publish(ack_topic, json.dumps(envelope), qos=1)
+        logger.info("Published priority ACK for %s on %s", amb_id, ack_topic)
+    except Exception as exc:
+        logger.warning("Error processing priority request: %s", exc)
+
+
+def _start_mqtt(host: str = "127.0.0.1", port: int = 1883) -> None:
+    global _local_broker, _mqtt_client, _mqtt_connected
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.3)
+    res = sock.connect_ex((host, port))
+    sock.close()
+    if res != 0:
+        logger.info("No active MQTT broker detected on %s:%d. Starting embedded broker...", host, port)
+        try:
+            _local_broker = LocalBroker(port)
+            _local_broker.start()
+            logger.info("Embedded MQTT broker started on port %d", port)
+        except Exception as e:
+            logger.warning("Could not start embedded MQTT broker: %s", e)
+
+    try:
+        from raspberry_pi_app.communication.discovery_beacon import start_discovery_beacon
+        start_discovery_beacon(mqtt_port=port, web_port=5000)
+    except Exception as exc:
+        logger.debug("Could not start discovery beacon: %s", exc)
+
+    try:
+        client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id="lifelane-web-dashboard",
+            clean_session=True,
+        )
+
+        def on_connect(c, _userdata, _flags, reason_code, _properties=None):
+            global _mqtt_connected
+            if reason_code == 0:
+                _mqtt_connected = True
+                logger.info("Web dashboard connected to MQTT broker on %s:%d", host, port)
+                prefix = str(_config.mqtt.get("topic_prefix", "lifelane"))
+                c.subscribe(f"{prefix}/ambulance/+/telemetry", qos=1)
+                c.subscribe(f"{prefix}/ambulance/+/telemetry2", qos=1)
+                c.subscribe(f"{prefix}/ambulance/+/emergency", qos=1)
+                c.subscribe(f"{prefix}/ambulance/+/cancel", qos=1)
+                c.subscribe(f"{prefix}/junction/+/priority", qos=1)
+                c.subscribe(f"{prefix}/junction/+/control", qos=1)
+                _on_event("MQTT_CONNECTED", f"Connected to broker on {host}:{port}")
+            else:
+                _mqtt_connected = False
+                logger.warning("MQTT connection failed with code: %s", reason_code)
+
+        def on_disconnect(c, _userdata, _disconnect_flags, reason_code, _properties=None):
+            global _mqtt_connected
+            _mqtt_connected = False
+            logger.info("MQTT disconnected (code %s)", reason_code)
+
+        def on_message(c, _userdata, message):
+            try:
+                topic = message.topic
+                raw_payload = message.payload
+                now_utc = datetime.now(timezone.utc)
+
+                if topic.endswith("/telemetry") or topic.endswith("/telemetry2"):
+                    packet = _parse_telemetry(raw_payload)
+                    if packet:
+                        with _state_lock:
+                            assessment = _coordinator.process_packet(packet, now_utc)
+                        side_str = assessment.approach.value if assessment.approach else (packet.approach_side or "")
+                        dist_val = packet.distance_to_stop_line if packet.distance_to_stop_line is not None else 0.0
+                        _on_event("TELEMETRY", f"{packet.ambulance_id} ({side_str or 'approaching'}) dist={dist_val:.0f}m speed={packet.speed_mps:.1f}m/s")
+                        _broadcast(_build_state())
+
+                elif topic.endswith("/emergency"):
+                    data = json.loads(raw_payload.decode("utf-8"))
+                    trip_id = str(data.get("tripId", ""))
+                    if not bool(data.get("emergencyActive", True)):
+                        with _state_lock:
+                            _coordinator.cancel(trip_id, "Emergency finished")
+                        _on_event("EMERGENCY_ENDED", f"Trip {trip_id} completed")
+                        _broadcast(_build_state())
+
+                elif topic.endswith("/cancel"):
+                    data = json.loads(raw_payload.decode("utf-8"))
+                    trip_id = str(data.get("tripId", ""))
+                    with _state_lock:
+                        _coordinator.cancel(trip_id, "Cancelled by vehicle")
+                    _on_event("TRIP_CANCELLED", f"Trip {trip_id} cancelled")
+                    _broadcast(_build_state())
+
+                elif topic.endswith("/priority"):
+                    _handle_mqtt_priority_request(c, topic, raw_payload)
+
+                elif topic.endswith("/control"):
+                    data = json.loads(raw_payload.decode("utf-8"))
+                    if str(data.get("messageType")) == "PRIORITY_CANCEL":
+                        trip_id = str(data.get("tripId", ""))
+                        with _state_lock:
+                            _coordinator.cancel(trip_id, "Priority cancelled by client")
+                        _on_event("PRIORITY_CANCEL", f"Trip {trip_id} preemption cancelled")
+                        _broadcast(_build_state())
+
+            except Exception as exc:
+                logger.debug("MQTT message processing exception on %s: %s", message.topic, exc)
+
+        client.on_connect = on_connect
+        client.on_disconnect = on_disconnect
+        client.on_message = on_message
+        client.connect_async(host, port, keepalive=30)
+        client.loop_start()
+        _mqtt_client = client
+    except Exception as err:
+        logger.warning("Could not initialize MQTT client: %s", err)
+
+
+def _stop_mqtt() -> None:
+    global _mqtt_client, _local_broker, _mqtt_connected
+    if _mqtt_client:
+        try:
+            _mqtt_client.loop_stop()
+            _mqtt_client.disconnect()
+        except Exception:
+            pass
+        _mqtt_client = None
+    _mqtt_connected = False
+    if _local_broker:
+        try:
+            _local_broker.stop()
+        except Exception:
+            pass
+        _local_broker = None
+    try:
+        from raspberry_pi_app.communication.discovery_beacon import stop_discovery_beacon
+        stop_discovery_beacon()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +732,11 @@ def main() -> None:
     sim_thread = threading.Thread(target=_simulation_loop, daemon=True)
     sim_thread.start()
 
+    _start_mqtt(
+        host=os.getenv("LIFELANE_MQTT_HOST", str(_config.mqtt.get("broker", "127.0.0.1"))),
+        port=int(os.getenv("LIFELANE_MQTT_PORT", str(_config.mqtt.get("port", 1883)))),
+    )
+
     server = HTTPServer(("0.0.0.0", args.port), LifeLaneHandler)
     lan_ip = get_local_ip()
     url = f"http://localhost:{args.port}"
@@ -487,6 +756,7 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Shutting down LifeLane web server.")
     finally:
+        _stop_mqtt()
         if _hardware_bridge:
             _hardware_bridge.stop()
         server.shutdown()

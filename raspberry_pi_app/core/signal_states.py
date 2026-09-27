@@ -1,15 +1,22 @@
 """Explicit signal and preemption state enumerations."""
 
 from enum import Enum
-
-
-class SignalColour(str, Enum):
-    RED = "RED"
-    YELLOW = "YELLOW"
-    GREEN = "GREEN"
+from .protocol import SignalColour
 
 
 class NormalPhase(str, Enum):
+    ALL_RED_BEFORE_NORTH = "ALL_RED_BEFORE_NORTH"
+    NORTH_GREEN = "NORTH_GREEN"
+    NORTH_YELLOW = "NORTH_YELLOW"
+    ALL_RED_BEFORE_EAST = "ALL_RED_BEFORE_EAST"
+    EAST_GREEN = "EAST_GREEN"
+    EAST_YELLOW = "EAST_YELLOW"
+    ALL_RED_BEFORE_SOUTH = "ALL_RED_BEFORE_SOUTH"
+    SOUTH_GREEN = "SOUTH_GREEN"
+    SOUTH_YELLOW = "SOUTH_YELLOW"
+    ALL_RED_BEFORE_WEST = "ALL_RED_BEFORE_WEST"
+    WEST_GREEN = "WEST_GREEN"
+    WEST_YELLOW = "WEST_YELLOW"
     ALL_RED_BEFORE_NS = "ALL_RED_BEFORE_NS"
     NS_GREEN = "NS_GREEN"
     NS_YELLOW = "NS_YELLOW"

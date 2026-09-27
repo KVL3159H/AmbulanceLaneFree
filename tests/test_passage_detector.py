@@ -1,25 +1,23 @@
-from dataclasses import replace
-
+from datetime import datetime, timedelta, timezone
 from raspberry_pi_app.core.gps_engine import GPSEngine
-from raspberry_pi_app.core.models import GPSAssessment
 from raspberry_pi_app.core.passage_detector import PassageDetector
 
 
-def test_crossing_requires_entry_and_multiple_increasing_points(config, packet_factory):
-    detector = PassageDetector(50, 60)
+def test_crossing_requires_entry_and_three_points_beyond_exit(config, packet_factory):
+    detector = PassageDetector(80, 60)
     engine = GPSEngine(config)
-    base = engine.assess(packet_factory(distance=30, sequence=1))
-    assert not detector.update(base)
-    # Southbound vehicle is now beyond the centre: bearing to centre is north (0), heading is south (180).
-    for sequence, distance in [(2, 10), (3, 18)]:
-        packet = packet_factory(distance=-distance, sequence=sequence)
-        result = engine.assess(packet)
-        assert not detector.update(result)
-    packet = packet_factory(distance=-30, sequence=4)
-    assert detector.update(engine.assess(packet))
+    now = datetime.now(timezone.utc)
+    distances = [100,90,80,70,30,10,-5,-15,-30,-60,-105,-115,-125]
+    for i, distance in enumerate(distances):
+        stamp = now+timedelta(seconds=i)
+        assessment = engine.assess(packet_factory(distance=distance, sequence=i+1, timestamp=stamp), stamp)
+        assert assessment.valid
+        crossed = detector.update(assessment)
+        assert crossed == (i == len(distances)-1)
 
 
 def test_single_point_cannot_restore_normal(config, packet_factory):
-    detector = PassageDetector(50)
+    detector = PassageDetector(80)
     assessment = GPSEngine(config).assess(packet_factory(distance=10))
     assert not detector.update(assessment)
+    assert not detector.entered_zone(assessment.packet.trip_id)

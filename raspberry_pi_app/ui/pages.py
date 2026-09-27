@@ -327,6 +327,12 @@ class SettingsPage(QWidget):
         self._spin(connection_form, "mqtt.port", "MQTT port", int(config.mqtt["port"]), 1, 65535)
         self._double(connection_form, "simulation.speed_multiplier", "Simulation speed", float(config.simulation["speed_multiplier"]), 0.1, 20, " ×")
         connection.body.addLayout(connection_form)
+        from scripts.run_broker import get_local_ip_addresses
+        addresses = ", ".join(ip for _label, ip in get_local_ip_addresses())
+        pairing = QLabel(f"Phone setup: connect to the same Wi-Fi, open LifeLane Settings, and enter this PC's address: {addresses}. Port: {config.mqtt['port']}. Keep Live mobile GPS enabled on the desktop.")
+        pairing.setWordWrap(True)
+        pairing.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        connection.body.addWidget(pairing)
         grid.addWidget(junction, 0, 0); grid.addWidget(timing, 0, 1); grid.addWidget(connection, 1, 0, 1, 2)
         scroll.setWidget(body); root.addWidget(scroll, 1)
         footer = QHBoxLayout(); self.error = QLabel(); self.error.setStyleSheet(f"color:{Color.AMBER};"); footer.addWidget(self.error); footer.addStretch()

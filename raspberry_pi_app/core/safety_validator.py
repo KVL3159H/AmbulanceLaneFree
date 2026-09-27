@@ -20,5 +20,9 @@ def conflicting_green(signals: dict[Approach, SignalColour]) -> bool:
 def assert_safe(signals: dict[Approach, SignalColour]) -> None:
     if set(signals) != set(Approach):
         raise UnsafeSignalState("signal state must contain all four approaches")
+    if any(not isinstance(colour, SignalColour) for colour in signals.values()):
+        raise UnsafeSignalState("unknown signal colour")
+    if SignalColour.GREEN in signals.values() and SignalColour.YELLOW in signals.values():
+        raise UnsafeSignalState("green and clearance yellow cannot coexist")
     if conflicting_green(signals):
         raise UnsafeSignalState("conflicting north/south and east/west greens detected")

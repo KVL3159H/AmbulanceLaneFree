@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 from collections import deque
+from typing import Any
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF
@@ -36,6 +37,7 @@ class JunctionScene(QGraphicsScene):
         self.ambulances: dict[str, AmbulanceItem] = {}
         self.trails: dict[str, tuple[QGraphicsPathItem, deque[QPointF]]] = {}
         self.civilian_cars: list[CivilianCarItem] = []
+        self.traffic_items = {}
         self.priority_corridor: QGraphicsPathItem | None = None
         self.setBackgroundBrush(QColor(Color.ELEVATED))
         self._draw_junction()
@@ -168,13 +170,45 @@ class JunctionScene(QGraphicsScene):
                 self.civilian_cars.append(car)
                 car_idx += 1
 
+    def clear_traffic(self) -> None:
+        for item in self.traffic_items.values():
+            self.removeItem(item)
+        self.traffic_items.clear()
+
     def update_traffic(
         self,
-        dt: float,
-        signals: dict[Approach, SignalColour],
-        preemption_state: PreemptionState,
-        target_approach: Approach | None,
+        dt_or_engine: float | Any,
+        signals: dict[Approach, SignalColour] | None = None,
+        preemption_state: PreemptionState | None = None,
+        target_approach: Approach | None = None,
     ) -> None:
+        if signals is None and hasattr(dt_or_engine, "vehicles"):
+            engine = dt_or_engine
+            active = {v.vehicle_id for v in engine.vehicles}
+            for key in list(self.traffic_items):
+                if key not in active:
+                    self.removeItem(self.traffic_items.pop(key))
+            for vehicle in engine.vehicles:
+                item = self.traffic_items.get(vehicle.vehicle_id)
+                if item is None:
+                    item = self.addRect(-2, -2.1, 4, 4.2, QPen(QColor("#FFFFFF"), 0.5), QBrush(QColor("#2563EB")))
+                    item.setZValue(8)
+                    self.traffic_items[vehicle.vehicle_id] = item
+                def canvas_axis(value):
+                    magnitude = abs(value)
+                    scaled = magnitude * 13.75 if magnitude <= 4 else (55 + (magnitude - 4) * 69 / 16 if magnitude <= 20 else 124 + (magnitude - 20) * 0.95)
+                    return math.copysign(scaled, value)
+                east, north, heading = vehicle.position
+                item.setPos(self.CX + canvas_axis(east), self.CY - canvas_axis(north))
+                item.setRotation(heading)
+                item.setToolTip(f"{vehicle.vehicle_id} · {vehicle.speed:.1f} m/s · {vehicle.stage.value}")
+            return
+
+        dt = float(dt_or_engine) if not isinstance(dt_or_engine, (int, float)) else dt_or_engine
+        if signals is None:
+            signals = {}
+        if preemption_state is None:
+            preemption_state = PreemptionState.NORMAL
         preemption_active = preemption_state not in (PreemptionState.NORMAL, PreemptionState.FAIL_SAFE)
 
         # Group cars by approach

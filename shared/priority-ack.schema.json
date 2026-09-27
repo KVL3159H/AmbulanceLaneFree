@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Emergency Way applied acknowledgement",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "messageType",
+    "requestId",
+    "tripId",
+    "ambulanceId",
+    "junctionId",
+    "controllerId",
+    "accepted",
+    "rejectionReason",
+    "queuePosition",
+    "grantedApproach",
+    "controllerState",
+    "lampState",
+    "acknowledgementTimestamp",
+    "mode"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "messageType": {
+      "const": "PRIORITY_ACK"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "tripId": {
+      "type": "string"
+    },
+    "ambulanceId": {
+      "type": "string"
+    },
+    "junctionId": {
+      "type": "string"
+    },
+    "controllerId": {
+      "type": "string"
+    },
+    "accepted": {
+      "type": "boolean"
+    },
+    "rejectionReason": {
+      "type": "string"
+    },
+    "queuePosition": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "grantedApproach": {
+      "type": "string"
+    },
+    "controllerState": {
+      "type": "string"
+    },
+    "lampState": {
+      "type": "object",
+      "required": [
+        "NORTH",
+        "EAST",
+        "SOUTH",
+        "WEST"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "NORTH": {
+          "enum": [
+            "RED",
+            "YELLOW",
+            "GREEN"
+          ]
+        },
+        "EAST": {
+          "enum": [
+            "RED",
+            "YELLOW",
+            "GREEN"
+          ]
+        },
+        "SOUTH": {
+          "enum": [
+            "RED",
+            "YELLOW",
+            "GREEN"
+          ]
+        },
+        "WEST": {
+          "enum": [
+            "RED",
+            "YELLOW",
+            "GREEN"
+          ]
+        }
+      }
+    },
+    "acknowledgementTimestamp": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "HARDWARE",
+        "SIMULATION"
+      ]
+    }
+  }
+}

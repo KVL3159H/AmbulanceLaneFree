@@ -7,21 +7,11 @@ from raspberry_pi_app.core.priority_manager import PriorityManager
 
 
 def add(manager, engine, packet, now):
+    # Queue unit tests use a confirmed domain assessment; GPS is tested separately.
     assessment = engine.assess(packet, now=now)
-    if not assessment.eligible and "insufficient approaching" in assessment.reason:
-        centre_lat = float(engine.config.junction["latitude"])
-        centre_lon = float(engine.config.junction["longitude"])
-        packet = replace(
-            packet,
-            sequence_number=packet.sequence_number + 1,
-            latitude=packet.latitude + (centre_lat - packet.latitude) * 0.1,
-            longitude=packet.longitude + (centre_lon - packet.longitude) * 0.1,
-            timestamp=packet.timestamp + timedelta(seconds=1),
-        )
-        now = now + timedelta(seconds=1)
-        assessment = engine.assess(packet, now=now)
-    assert assessment.eligible
+    assessment = replace(assessment, valid=True, eligible=True)
     return manager.add_or_update(assessment, now)
+
 
 
 def test_red_priority_before_yellow(config, packet_factory):

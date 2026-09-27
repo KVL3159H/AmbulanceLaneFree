@@ -1,3 +1,9 @@
+> **Emergency Way upgrade:** See [current setup, verification and acceptance gaps](docs/emergency-way-upgrade.md),
+> [state machines](docs/upgrade-state-machines.md), and [baseline findings](docs/upgrade-baseline.md).
+> The upgraded desktop includes ordinary vehicles, orange light styling and a hardware monitor;
+> the new headless Pi runtime includes authenticated requests and GPIO interlocks.
+> Hardware acceptance remains unverified. The older Phase 1 notes below describe the original simulator.
+
 # LifeLane — Smart Ambulance Traffic Signal Preemption Simulator
 
 LifeLane is a Phase 1, software-only demonstration of a four-way traffic junction. It contains a native PySide6 desktop simulator for Windows and Raspberry Pi 5, and an Android/Kotlin application that transmits live fused-location telemetry over MQTT.
@@ -18,10 +24,12 @@ LifeLane is a Phase 1, software-only demonstration of a four-way traffic junctio
 - Paho MQTT client with QoS 1, retained junction status, last will, reconnect backoff, environment-based credentials, and lifecycle topics.
 - SQLite storage for ambulances, trips, telemetry, and signal events using parameterized statements.
 - Rotating application logs in `logs/lifelane.log`.
-- Complete native Kotlin Jetpack Compose driver app with branded splash, sign-in, ambulance selection, three-step emergency creation, explicit confirmation, live emergency progression, dark/light themes, adaptive portrait/landscape layouts, TalkBack descriptions, fused GPS, foreground location service, and MQTT reconnect/LWT/QoS 1.
+- Complete native Kotlin Jetpack Compose driver app with sign-in, ambulance selection, Home/Map/Trips/Settings navigation, a three-step map-first emergency flow, explicit confirmation, light/dark/system themes, TalkBack-aware controls, fused GPS, foreground location service, and correlated MQTT request acknowledgements.
 - First-class Windows desktop software: one-click runners (`run_windows.bat`), taskbar icon grouping with custom `AppUserModelID`, and standalone `.exe` build via PyInstaller.
 
 ## Windows installation and standalone software (.exe)
+
+For the updated connected prototype, launch `run_connected_prototype.bat` and install the rebuilt `LifeLane-debug.apk`. The Windows app starts its local broker automatically; Android Settings now lets you enter the PC address without rebuilding. See [connection and verification guide](docs/connected-prototype.md).
 
 LifeLane runs natively on Windows 10/11. See [Windows Installation & Deployment Guide](docs/windows-installation.md) for full instructions.
 
@@ -142,7 +150,7 @@ nano .env
    ./gradlew assembleDebug
    ```
 
-7. Install `android_app/app/build/outputs/apk/debug/app-debug.apk`, open LifeLane, grant foreground location/notification permissions, complete the trip setup, and press **START EMERGENCY ROUTE**.
+7. Install `android_app/app/build/outputs/apk/debug/app-debug.apk`, open LifeLane, grant foreground location/notification permissions, complete the trip setup, and press **Start emergency trip**.
 8. In the Pi app, select **Live mobile GPS**. The connection and packet state will appear in the information/event panels.
 
 Android emulator note: use `10.0.2.2` for a broker on the development computer. A physical phone must use the Pi's LAN IP; never use `localhost` for the Pi from the phone.
