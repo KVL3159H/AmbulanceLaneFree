@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a reproducible defect in LifeLane / AmbulanceLaneFree
+title: "[BUG] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the project. Do not include passwords, tokens, private keys, or sensitive location data.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Windows / PySide6 app
+        - Raspberry Pi runtime
+        - Android app
+        - MQTT / networking
+        - Simulation
+        - ESP32 / signal controller
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behaviour.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start...
+        2. Select...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Windows 11 / Raspberry Pi OS / Android version / Python version"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove secrets and personal data before pasting logs.
+      render: shell
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: This report does not contain secrets or private credentials.
+          required: true
+        - label: I understand this is an engineering prototype, not a certified real-road traffic controller.
+          required: true
